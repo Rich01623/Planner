@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v4.6</title>
+    <title>FROST Transport Planner - v4.7 (Auto-Rollover)</title>
     <style>
         :root {
             --frost-red: #c1272d;
@@ -21,6 +21,11 @@
         .logo-container img { height: 50px; }
         .grand-total-box { background: var(--frost-black); color: white; padding: 5px 15px; border-radius: 6px; border-left: 4px solid var(--price-green); text-align: right; }
         .grand-total-value { font-size: 1.1rem; font-weight: bold; color: var(--whatsapp-green); }
+        .rollover-info { font-size: 0.65rem; color: #888; margin-top: 2px; }
+
+        .header-controls { display: flex; gap: 10px; align-items: center; }
+        .btn-test { background: #ff9800; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.7rem; }
+        .btn-print { background: #555; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
 
         .week-selector { background: #333; padding: 5px 10px; display: flex; gap: 5px; justify-content: center; }
         .week-btn { padding: 8px 25px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; }
@@ -70,10 +75,14 @@
 <header>
     <div class="logo-container">
         <img src="logo.png" alt="FROST">
-        <div class="grand-total-box"><span class="grand-total-value" id="grand-total">£0.00</span></div>
+        <div class="grand-total-box">
+            <span class="grand-total-value" id="grand-total">£0.00</span>
+            <div class="rollover-info">Week Refreshed: <span id="last-roll-date">Never</span></div>
+        </div>
     </div>
     <div class="header-controls">
-        <button onclick="window.print()">Print Board</button>
+        <button class="btn-test" onclick="if(confirm('FORCE TEST: This will delete current jobs and move Next Week to This Week. Continue?')) performRollover()">FORCE ROLLOVER (TEST)</button>
+        <button class="btn-print" onclick="window.print()">Print Board</button>
         <input type="text" id="search-jobs" placeholder="Search...">
     </div>
 </header>
@@ -173,7 +182,6 @@
         document.getElementById('planner-this').style.display = (week === 'this' ? 'table-row-group' : 'none');
         document.getElementById('planner-next').style.display = (week === 'next' ? 'table-row-group' : 'none');
         
-        // Hide/Show unassigned jobs based on their week attribute
         document.querySelectorAll('#pool-container .job-card').forEach(card => {
             card.style.display = (card.getAttribute('data-week') === week) ? 'block' : 'none';
         });
@@ -217,7 +225,6 @@
         const cust = document.getElementById('cust-name').value;
         if(!cust || !dateVal) return;
 
-        // Logic to determine week
         const inputDate = new Date(dateVal);
         const today = new Date();
         const nextMon = new Date();
@@ -240,7 +247,7 @@
         );
         
         document.getElementById('pool-container').appendChild(card);
-        switchWeek(weekAttr); // Switch view to where the job was added
+        switchWeek(weekAttr); 
         saveAll();
         updateCalculations();
         ['cust-name','cust-ref','coll-time','pickup','delivery','trailer-num','job-price','job-notes'].forEach(id => document.getElementById(id).value = '');
@@ -307,6 +314,8 @@
         });
     }
 
+    // --- AUTOMATION & STORAGE ---
+
     function saveAll() {
         const data = { pool: [], board: {} };
         document.querySelectorAll('.job-card').forEach(card => {
@@ -324,12 +333,62 @@
                 data.board[obj.parentId].push(obj);
             }
         });
-        localStorage.setItem('frostPlanner_v46', JSON.stringify(data));
+        localStorage.setItem('frostPlanner_v47', JSON.stringify(data));
+        const rollDate = localStorage.getItem('lastRolloverDate') || new Date().toDateString();
+        document.getElementById('last-roll-date').innerText = rollDate;
+    }
+
+    function performRollover() {
+        const saved = localStorage.getItem('frostPlanner_v47');
+        if (!saved) return;
+        let data = JSON.parse(saved);
+
+        // Filter: Keep Next Week jobs, promote them to This Week
+        data.pool = data.pool.filter(j => j.week === 'next').map(j => ({ ...j, week: 'this' }));
+        
+        const newBoard = {};
+        for (let slotId in data.board) {
+            if (slotId.startsWith('planner-next')) {
+                const newSlotId = slotId.replace('planner-next', 'planner-this');
+                newBoard[newSlotId] = data.board[slotId].map(j => ({ ...j, week: 'this' }));
+            }
+        }
+        data.board = newBoard;
+
+        localStorage.setItem('lastRolloverDate', new Date().toDateString());
+        localStorage.setItem('frostPlanner_v47', JSON.stringify(data));
+        location.reload(); 
+    }
+
+    function checkWeekRollover() {
+        const lastRoll = localStorage.getItem('lastRolloverDate');
+        if (!lastRoll) {
+            localStorage.setItem('lastRolloverDate', new Date().toDateString());
+            return;
+        }
+
+        const now = new Date();
+        const lastDate = new Date(lastRoll);
+        let tempDate = new Date(lastDate);
+        let sundayPassed = false;
+
+        while (tempDate < now) {
+            tempDate.setDate(tempDate.getDate() + 1);
+            if (tempDate.getDay() === 0) { sundayPassed = true; break; }
+        }
+
+        if (sundayPassed) {
+            if (confirm("Sunday has passed. Roll board forward?")) performRollover();
+        }
     }
 
     function loadAll() {
-        const saved = localStorage.getItem('frostPlanner_v46');
-        if(!saved) return;
+        const saved = localStorage.getItem('frostPlanner_v47');
+        const rollDate = localStorage.getItem('lastRolloverDate');
+        if(rollDate) document.getElementById('last-roll-date').innerText = rollDate;
+
+        if(!saved) { checkWeekRollover(); return; }
+        
         const data = JSON.parse(saved);
         data.pool.forEach(d => {
             const card = createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, d.week, d.id);
@@ -343,6 +402,7 @@
                 if(slot) slot.appendChild(card);
             });
         }
+        checkWeekRollover();
         switchWeek('this');
         updateCalculations();
     }
