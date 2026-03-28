@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v4.9.5 (PODs Link)</title>
+    <title>FROST Transport Planner - v4.9.5 (Supabase Sync)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --frost-red: #c1272d;
@@ -145,6 +146,11 @@
 </main>
 
 <script>
+    // INITIALIZE SUPABASE
+    const _URL = "https://tdrzytgiqvdulityqttr.supabase.co";
+    const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkcnp5dGdpcXZkdWxpdHlxdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTM5NTMsImV4cCI6MjA4ODcyOTk1M30.XN46i7u6STD-2afmN7-Jh1MltADGpEuWlLt_n7wknbA";
+    const sb = supabase.createClient(_URL, _KEY);
+
     const fleet = [
         { name: "Andy West", phone: "447734369810" }, { name: "Callum Lee", phone: "447359390140" },
         { name: "Josh Harrison", phone: "447701238574" }, { name: "Lee Woodcock", phone: "447701238577" },
@@ -169,12 +175,26 @@
     function allowDrop(ev) { ev.preventDefault(); }
     function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
     
-    function drop(ev) {
+    // UPDATED DROP FUNCTION WITH HANDSHAKE
+    async function drop(ev) {
         ev.preventDefault();
         const id = ev.dataTransfer.getData("text");
         const card = document.getElementById(id);
-        ev.currentTarget.appendChild(card);
-        ev.currentTarget.tagName === 'TD' ? card.classList.add('on-board') : card.classList.remove('on-board', 'expanded');
+        const target = ev.currentTarget;
+        
+        target.appendChild(card);
+        
+        if (target.tagName === 'TD') {
+            card.classList.add('on-board');
+            // SUPABASE HANDSHAKE: Update status to 'assigned' when dropped on the board
+            const { error } = await sb.from('quotes').update({ status: 'assigned' }).eq('id', id);
+            if(error) console.error("Handshake Failed:", error.message);
+        } else {
+            card.classList.remove('on-board', 'expanded');
+            // SUPABASE HANDSHAKE: Reset status if moved back to unassigned pool
+            await sb.from('quotes').update({ status: 'pending' }).eq('id', id);
+        }
+        
         saveAll();
         updateCalculations();
     }
@@ -310,15 +330,29 @@
         document.getElementById('last-roll-date').innerText = localStorage.getItem('lastRolloverDate') || 'Never';
     }
 
-    function loadAll() {
+    // UPDATED LOAD FUNCTION TO SYNC WITH SUPABASE REAL-TIME
+    async function loadAll() {
+        // First load local storage as usual
         const saved = localStorage.getItem('frostPlanner_v495');
-        if(!saved) return;
-        const data = JSON.parse(saved);
-        data.pool.forEach(d => document.getElementById('pool-container').appendChild(createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, 'this', d.id, d.pod)));
-        for(let slot in data.board) { data.board[slot].forEach(d => {
-            const c = createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, 'this', d.id, d.pod);
-            c.classList.add('on-board'); if(document.getElementById(slot)) document.getElementById(slot).appendChild(c);
-        }); }
+        if(saved) {
+            const data = JSON.parse(saved);
+            data.pool.forEach(d => document.getElementById('pool-container').appendChild(createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, 'this', d.id, d.pod)));
+            for(let slot in data.board) { data.board[slot].forEach(d => {
+                const c = createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, 'this', d.id, d.pod);
+                c.classList.add('on-board'); if(document.getElementById(slot)) document.getElementById(slot).appendChild(c);
+            }); }
+        }
+
+        // THEN: Fetch and insert any live orders from Supabase that aren't on board yet
+        const { data: remoteQuotes } = await sb.from('quotes').select('*').eq('status', 'pending');
+        if(remoteQuotes) {
+            remoteQuotes.forEach(q => {
+                if(!document.getElementById(q.id)) {
+                   const c = createCardElement(q.customer_name, q.reference, '00:00', q.pickup, q.delivery, 'TBC', q.total_price.toString(), q.notes, new Date().toISOString().split('T')[0], 'this', q.id, false);
+                   document.getElementById('pool-container').appendChild(c);
+                }
+            });
+        }
         updateCalculations();
     }
 
