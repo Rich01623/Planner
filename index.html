@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v5.0.0</title>
+    <title>FROST Transport Planner - v5.4.0</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
     <style>
         :root {
             --frost-red: #c1272d;
@@ -15,7 +18,6 @@
             --whatsapp-green: #25D366;
             --price-green: #2e7d32;
             --pod-complete-blue: #e3f2fd;
-            --next-week-bg: #f0f7ff; 
         }
 
         body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--light-grey); }
@@ -29,18 +31,19 @@
         .week-btn { padding: 8px 25px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; text-decoration: none; font-size: 0.85rem; }
         .week-btn:hover { background: #777; }
         .week-btn.active { background: var(--frost-red); }
-        .pod-nav-btn { background: var(--frost-blue); }
-        .pod-nav-btn:hover { background: #004494; }
+        .nav-blue { background: var(--frost-blue); }
 
         main { display: grid; grid-template-columns: 280px 320px 1fr; flex-grow: 1; overflow: hidden; gap: 10px; padding: 10px; }
-        #data-input, #pending-pool, #planner-board { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; display: flex; flex-direction: column; }
+        #data-input, #pending-pool, #planner-board, #invoicing-view { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; display: flex; flex-direction: column; }
         #pool-container { background: #e2e2e2; border: 2px dashed #999; flex-grow: 1; overflow-y: auto; padding: 8px; min-height: 100px; }
         
-        #planner-board { overflow: auto; padding: 0; }
-        table { width: 100%; border-collapse: collapse; min-width: 1250px; table-layout: fixed; }
-        th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.9rem; text-transform: uppercase; }
-        .day-total { background: var(--price-green); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px; }
+        #planner-board, #invoicing-view { overflow: auto; padding: 0; }
+        table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
+        th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.9rem; text-transform: uppercase; text-align: left; }
         
+        .invoice-table td { padding: 12px 8px; border-bottom: 1px solid #eee; font-size: 0.85rem; vertical-align: middle; }
+        .batch-bar { background: #eee; padding: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ccc; position: sticky; top: 0; z-index: 10; }
+
         .driver-cell { background: #eee; font-weight: bold; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); font-size: 0.85rem; }
         .driver-weekly-total { font-size: 0.7rem; color: #666; background: #ddd; padding: 2px 6px; border-radius: 4px; display: block; margin-top: 4px; width: fit-content; }
         td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
@@ -52,7 +55,6 @@
         .card-actions { display: flex; gap: 8px; align-items: center; }
         .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; }
         .wa-btn:hover { color: var(--whatsapp-green); }
-        .pod-btn:hover { color: var(--frost-blue); }
         .mark-btn:hover { color: var(--price-green); }
         .delete-btn:hover { color: var(--frost-red); }
 
@@ -72,8 +74,6 @@
 </head>
 <body>
 
-<audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
-
 <header>
     <div class="logo-container">
         <img src="logo.png" alt="FROST">
@@ -83,14 +83,15 @@
     </div>
     <div style="display:flex; gap:10px;">
         <button onclick="performRollover()" style="background:#ff9800; color:white; border:none; padding:5px 10px; border-radius:4px; font-weight:bold; cursor:pointer;">ROLL WEEK</button>
-        <button onclick="window.print()" style="padding: 5px 10px; cursor:pointer;">Print</button>
+        <button onclick="window.print()" style="padding: 5px 10px; cursor:pointer;">Print Board</button>
     </div>
 </header>
 
 <div class="week-selector">
-    <button class="week-btn active" id="btn-this" onclick="switchWeek('this')">THIS WEEK'S BOARD</button>
-    <button class="week-btn" id="btn-next" onclick="switchWeek('next')">NEXT WEEK'S BOARD</button>
-    <a href="https://drive.google.com/drive/folders/1FCaMhHMWnYWDdCDHc_Ssuo5u4rcmJMyo?usp=sharing" target="_blank" class="week-btn pod-nav-btn">PODs FOLDER</a>
+    <button class="week-btn active" id="btn-this" onclick="switchView('this')">THIS WEEK</button>
+    <button class="week-btn" id="btn-next" onclick="switchView('next')">NEXT WEEK</button>
+    <button class="week-btn nav-blue" id="btn-invoice" onclick="switchView('invoice')">INVOICING CENTER</button>
+    <a href="https://drive.google.com/drive/folders/1FCaMhHMWnYWDdCDHc_Ssuo5u4rcmJMyo?usp=sharing" target="_blank" class="week-btn nav-blue">PODs FOLDER</a>
 </div>
 
 <main id="main-container">
@@ -122,15 +123,42 @@
             <thead>
                 <tr>
                     <th style="width:160px;">Driver</th>
-                    <th>Mon <span class="day-total" id="total-0">£0</span></th>
-                    <th>Tue <span class="day-total" id="total-1">£0</span></th>
-                    <th>Wed <span class="day-total" id="total-2">£0</span></th>
-                    <th>Thu <span class="day-total" id="total-3">£0</span></th>
-                    <th>Fri <span class="day-total" id="total-4">£0</span></th>
+                    <th>Mon <span id="total-0" style="color:var(--whatsapp-green); font-size:0.7rem;">£0</span></th>
+                    <th>Tue <span id="total-1" style="color:var(--whatsapp-green); font-size:0.7rem;">£0</span></th>
+                    <th>Wed <span id="total-2" style="color:var(--whatsapp-green); font-size:0.7rem;">£0</span></th>
+                    <th>Thu <span id="total-3" style="color:var(--whatsapp-green); font-size:0.7rem;">£0</span></th>
+                    <th>Fri <span id="total-4" style="color:var(--whatsapp-green); font-size:0.7rem;">£0</span></th>
                 </tr>
             </thead>
             <tbody id="planner-this"></tbody>
             <tbody id="planner-next" style="display:none;"></tbody>
+        </table>
+    </section>
+
+    <section id="invoicing-view" style="display:none;">
+        <div class="batch-bar">
+            <div>
+                <strong>Invoicing Center</strong> | 
+                <span id="selected-count">0 jobs selected</span>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <button onclick="generateIndividualInvoices()" style="background:var(--frost-blue); color:white; border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">1. DOWNLOAD PDFs</button>
+                <button onclick="markBatchAsBilled()" style="background:var(--frost-black); color:white; border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">2. MARK AS BILLED & CLEAR</button>
+            </div>
+        </div>
+        <table class="invoice-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;"><input type="checkbox" onclick="toggleAllInvoices(this)"></th>
+                    <th>Customer</th>
+                    <th>Reference</th>
+                    <th>Date</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="invoice-list-body"></tbody>
         </table>
     </section>
 </main>
@@ -148,10 +176,9 @@
         { name: "Roy Taylor", phone: "447701238558" }, { name: "Stuart Sleigh", phone: "447701238575" }
     ];
 
-    let currentActiveWeek = 'this';
-    document.getElementById('job-date').valueAsDate = new Date();
+    let currentActiveView = 'this';
+    let allJobsRaw = []; 
 
-    // Init Board
     ['planner-this', 'planner-next'].forEach(boardId => {
         const board = document.getElementById(boardId);
         fleet.forEach((driver, i) => {
@@ -171,15 +198,9 @@
         const card = document.getElementById(id);
         const target = ev.currentTarget;
         target.appendChild(card);
-        
         const isBoard = target.tagName === 'TD';
         card.classList.toggle('on-board', isBoard);
-
-        await sb.from('quotes').update({ 
-            status: isBoard ? 'assigned' : 'pending',
-            assigned_slot: isBoard ? target.id : null 
-        }).eq('id', id);
-
+        await sb.from('quotes').update({ status: isBoard ? 'assigned' : 'pending', assigned_slot: isBoard ? target.id : null }).eq('id', id);
         updateCalculations();
     }
 
@@ -187,25 +208,123 @@
         document.querySelectorAll('.job-card').forEach(c => c.remove());
         const { data: jobs } = await sb.from('quotes').select('*');
         if (jobs) {
+            allJobsRaw = jobs;
+            const invoiceBody = document.getElementById('invoice-list-body');
+            invoiceBody.innerHTML = ''; 
+
             jobs.forEach(q => {
                 const card = createCardElement(q.customer_name, q.reference, '00:00', q.pickup, q.delivery, 'TBC', q.total_price, q.notes, q.date, 'this', q.id, (q.status === 'completed'));
+                
                 if (q.status === 'assigned' && q.assigned_slot) {
                     const slot = document.getElementById(q.assigned_slot);
                     if (slot) { card.classList.add('on-board'); slot.appendChild(card); }
-                } else {
+                } else if (q.status === 'pending') {
                     document.getElementById('pool-container').appendChild(card);
+                }
+
+                if (q.status === 'completed') {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><input type="checkbox" class="inv-check" data-id="${q.id}" onchange="updateBatchTotal()"></td>
+                        <td><strong>${q.customer_name}</strong></td>
+                        <td>${q.reference}</td>
+                        <td>${q.date}</td>
+                        <td>£${q.total_price}</td>
+                        <td><span style="color:var(--frost-blue); font-weight:bold;">READY</span></td>
+                        <td><button onclick="window.open('https://drive.google.com/drive/search?q=${q.id}', '_blank')">View POD</button></td>
+                    `;
+                    invoiceBody.appendChild(row);
                 }
             });
         }
         updateCalculations();
     }
 
+    async function markBatchAsBilled() {
+        const selectedChecks = document.querySelectorAll('.inv-check:checked');
+        if (selectedChecks.length === 0) return alert("Select jobs to clear first!");
+
+        const confirmClear = confirm(`WARNING: You are about to mark ${selectedChecks.length} jobs as BILLED.\n\nThey will be removed from this view and the Planner board forever. Proceed?`);
+        
+        if (confirmClear) {
+            for (const cb of selectedChecks) {
+                const id = cb.getAttribute('data-id');
+                await sb.from('quotes').update({ status: 'billed' }).eq('id', id);
+            }
+            alert("Batch completed and moved to archives.");
+            loadAll();
+        }
+    }
+
+    function generateIndividualInvoices() {
+        const selectedChecks = document.querySelectorAll('.inv-check:checked');
+        if (selectedChecks.length === 0) return alert("Select jobs first!");
+
+        const { jsPDF } = window.jspdf;
+
+        selectedChecks.forEach((cb, index) => {
+            const id = cb.getAttribute('data-id');
+            const job = allJobsRaw.find(j => j.id == id);
+            
+            if (job) {
+                setTimeout(() => {
+                    const doc = new jsPDF();
+                    doc.setFontSize(22); doc.setTextColor(193, 39, 45);
+                    doc.text("FROST TRANSPORT SOLUTIONS", 14, 20);
+                    doc.setFontSize(10); doc.setTextColor(0, 0, 0);
+                    doc.text("INVOICE", 14, 28);
+                    doc.text(`Reference: ${job.reference || 'N/A'}`, 14, 33);
+                    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 38);
+
+                    doc.autoTable({
+                        startY: 45,
+                        head: [['Customer', 'Ref', 'Job Date', 'Route', 'Amount']],
+                        body: [[job.customer_name, job.reference, job.date, job.pickup + " to " + job.delivery, "£" + job.total_price]],
+                        headStyles: { fillColor: [26, 26, 26] }
+                    });
+
+                    const finalY = doc.lastAutoTable.finalY + 15;
+                    doc.setFontSize(14); doc.setFont(undefined, 'bold');
+                    doc.text(`TOTAL DUE: £${parseFloat(job.total_price).toFixed(2)}`, 140, finalY);
+
+                    const safeName = job.customer_name.replace(/[^a-z0-9]/gi, '_');
+                    const safeRef = (job.reference || 'REF').replace(/[^a-z0-9]/gi, '_');
+                    doc.save(`Invoice_${safeName}_${safeRef}.pdf`);
+                }, index * 400);
+            }
+        });
+    }
+
+    function switchView(view) {
+        currentActiveView = view;
+        document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('planner-board').style.display = (view === 'invoice' ? 'none' : 'block');
+        document.getElementById('invoicing-view').style.display = (view === 'invoice' ? 'block' : 'none');
+        
+        if (view !== 'invoice') {
+            document.getElementById('planner-this').style.display = (view === 'this' ? 'table-row-group' : 'none');
+            document.getElementById('planner-next').style.display = (view === 'next' ? 'table-row-group' : 'none');
+            document.getElementById('btn-' + view).classList.add('active');
+        } else {
+            document.getElementById('btn-invoice').classList.add('active');
+        }
+        updateCalculations();
+    }
+
+    function updateBatchTotal() {
+        const count = document.querySelectorAll('.inv-check:checked').length;
+        document.getElementById('selected-count').innerText = `${count} jobs selected`;
+    }
+
+    function toggleAllInvoices(master) {
+        document.querySelectorAll('.inv-check').forEach(cb => cb.checked = master.checked);
+        updateBatchTotal();
+    }
+
     function createCardElement(cust, ref, time, pick, del, trail, price, notes, date, week, id, pod) {
         const card = document.createElement('div');
         card.className = "job-card" + (pod ? " pod-complete" : "");
-        card.id = id;
-        card.draggable = true;
-        card.ondragstart = drag;
+        card.id = id; card.draggable = true; card.ondragstart = drag;
         card.onclick = function(e) { if(!e.target.classList.contains('action-btn')) this.classList.toggle('expanded'); };
         card.innerHTML = `
             <div class="card-row-1">
@@ -213,8 +332,6 @@
                     <span class="action-btn wa-btn" onclick="sendWhatsApp(event, '${id}')">✆</span>
                     <span class="action-btn pod-btn" onclick="event.stopPropagation(); window.open('https://drive.google.com/drive/search?q=${id}', '_blank')">📎</span>
                     <span class="action-btn mark-btn" onclick="markPODReceived(event, '${id}')">✅</span>
-                    <span class="action-btn" onclick="duplicateCard(event, '${id}')">❏</span>
-                    <span class="action-btn" onclick="editCard(event, '${id}')">✎</span>
                 </div>
                 <span class="action-btn delete-btn" onclick="deleteJob('${id}')">×</span>
             </div>
@@ -224,125 +341,60 @@
                 <span class="price-tag">£<span class="data-price">${price}</span></span>
             </div>
             <div class="card-body">
-                <div style="font-size:0.6rem; color:#888;"><span class="data-date">${date}</span> | <span class="data-time">${time}</span></div>
-                <div>Ref: <span class="data-ref">${ref}</span></div>
+                <div style="font-size:0.6rem; color:#888;"><span class="data-date">${date}</span> | Ref: <span class="data-ref">${ref}</span></div>
                 <div><span class="data-pick">${pick}</span> ➔ <span class="data-del">${del}</span></div>
-                <div class="data-notes" style="font-style:italic; font-size:0.6rem;">${notes}</div>
             </div>`;
         return card;
     }
 
     async function addNewJob() {
         const cust = document.getElementById('cust-name').value;
-        const date = document.getElementById('job-date').value;
-        if(!cust || !date) return alert("Required: Customer & Date");
-        
+        if(!cust) return alert("Customer Name required");
         await sb.from('quotes').insert([{
-            customer_name: cust,
-            reference: document.getElementById('cust-ref').value,
-            pickup: document.getElementById('pickup').value,
-            delivery: document.getElementById('delivery').value,
-            total_price: document.getElementById('job-price').value || "0",
-            notes: document.getElementById('job-notes').value,
-            status: 'pending'
+            customer_name: cust, reference: document.getElementById('cust-ref').value,
+            pickup: document.getElementById('pickup').value, delivery: document.getElementById('delivery').value,
+            total_price: document.getElementById('job-price').value || "0", notes: document.getElementById('job-notes').value, status: 'pending'
         }]);
-
         loadAll();
-        ['cust-name','cust-ref','coll-time','pickup','delivery','trailer-num','job-price','job-notes'].forEach(i => document.getElementById(i).value = '');
     }
 
     async function deleteJob(id) {
-        if(!confirm("Delete job?")) return;
-        await sb.from('quotes').delete().eq('id', id);
-        document.getElementById(id).remove();
-        updateCalculations();
+        if(confirm("Delete job?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); }
+    }
+
+    async function markPODReceived(e, id) {
+        e.stopPropagation();
+        if(confirm(`Move to Invoicing?`)) {
+            await sb.from('quotes').update({ status: 'completed' }).eq('id', id);
+            loadAll(); 
+        }
     }
 
     function sendWhatsApp(e, id) {
         e.stopPropagation();
         const card = document.getElementById(id);
-        const driverName = card.closest('tr')?.querySelector('.driver-cell span')?.innerText || "";
-        const driverObj = fleet.find(d => d.name === driverName);
-        if(!driverObj) return alert("Assign to a driver first!");
-        
-        const text = encodeURIComponent(`*FROST TRANSPORT*\nDate: ${card.querySelector('.data-date').innerText}\nCust: ${card.querySelector('.data-cust').innerText}\nRef: ${card.querySelector('.data-ref').innerText}\nPick: ${card.querySelector('.data-pick').innerText}\nDel: ${card.querySelector('.data-del').innerText}\nTrailer: ${card.querySelector('.data-trail').innerText}\n\nPOD: https://script.google.com/macros/s/AKfycbzfVb0yx0XMJytLgyWJgqFPBi0U2brnecZXYGYW299YfG6EmNK-AFJcj5DahTWQl881/exec?jobid=${id}`);
-        window.open(`https://wa.me/${driverObj.phone}?text=${text}`, '_blank');
-    }
-
-    async function markPODReceived(e, id) {
-        e.stopPropagation();
-        if(confirm(`Confirm POD received?`)) {
-            await sb.from('quotes').update({ status: 'completed' }).eq('id', id);
-            document.getElementById(id).classList.add('pod-complete');
-        }
-    }
-
-    function editCard(e, id) {
-        e.stopPropagation(); 
-        const c = document.getElementById(id);
-        document.getElementById('cust-name').value = c.querySelector('.data-cust').innerText;
-        document.getElementById('cust-ref').value = c.querySelector('.data-ref').innerText;
-        document.getElementById('pickup').value = c.querySelector('.data-pick').innerText;
-        document.getElementById('delivery').value = c.querySelector('.data-del').innerText;
-        document.getElementById('job-price').value = c.querySelector('.data-price').innerText;
-        document.getElementById('trailer-num').value = c.querySelector('.data-trail').innerText;
-        document.getElementById('coll-time').value = c.querySelector('.data-time').innerText;
-        document.getElementById('job-notes').value = c.querySelector('.data-notes').innerText;
-        document.getElementById('job-date').value = c.querySelector('.data-date').innerText;
-        deleteJob(id);
-    }
-
-    async function duplicateCard(e, id) {
-        e.stopPropagation(); 
-        const c = document.getElementById(id);
-        await sb.from('quotes').insert([{
-            customer_name: c.querySelector('.data-cust').innerText,
-            reference: c.querySelector('.data-ref').innerText,
-            pickup: c.querySelector('.data-pick').innerText,
-            delivery: c.querySelector('.data-del').innerText,
-            total_price: c.querySelector('.data-price').innerText,
-            notes: c.querySelector('.data-notes').innerText,
-            status: 'pending'
-        }]);
-        loadAll();
+        const dr = card.closest('tr')?.querySelector('.driver-cell span')?.innerText;
+        const driver = fleet.find(d => d.name === dr);
+        if(!driver) return alert("Assign a driver!");
+        const msg = encodeURIComponent(`*FROST TRANSPORT*\nDate: ${card.querySelector('.data-date').innerText}\nCust: ${card.querySelector('.data-cust').innerText}\nRef: ${card.querySelector('.data-ref').innerText}\nPOD: https://script.google.com/macros/s/AKfycbzfVb0yx0XMJytLgyWJgqFPBi0U2brnecZXYGYW299YfG6EmNK-AFJcj5DahTWQl881/exec?jobid=${id}`);
+        window.open(`https://wa.me/${driver.phone}?text=${msg}`, '_blank');
     }
 
     function updateCalculations() {
-        let grand = 0; let dayTots = Array(5).fill(0);
-        const boardId = 'planner-' + currentActiveWeek;
-        fleet.forEach((_, i) => { if(document.getElementById(`${boardId}-total-${i}`)) document.getElementById(`${boardId}-total-${i}`).innerText = "Week: £0"; });
-        
-        document.querySelectorAll(`#${boardId} td[id*="-s"]`).forEach(slot => {
-            const drIdx = slot.id.split('-dr')[1].split('-s')[0];
+        let grand = 0; let dayTots = [0,0,0,0,0];
+        const bId = 'planner-' + (currentActiveView === 'invoice' ? 'this' : currentActiveView);
+        document.querySelectorAll(`#${bId} td[id*="-s"]`).forEach(slot => {
             const dayIdx = parseInt(slot.id.split('-s')[1]);
             slot.querySelectorAll('.data-price').forEach(p => {
                 const val = parseFloat(p.innerText) || 0;
                 grand += val; dayTots[dayIdx] += val;
-                let totEl = document.getElementById(`${boardId}-total-${drIdx}`);
-                let current = parseFloat(totEl.innerText.replace('Week: £','')) || 0;
-                totEl.innerText = "Week: £" + (current + val).toFixed(2);
             });
         });
         document.getElementById('grand-total').innerText = "£" + grand.toFixed(2);
-        dayTots.forEach((v,i) => {
-            const el = document.getElementById('total-'+i);
-            if(el) el.innerText = "£"+v.toFixed(2);
-        });
+        dayTots.forEach((v,i) => { if(document.getElementById('total-'+i)) document.getElementById('total-'+i).innerText = "£"+v.toFixed(2); });
     }
 
-    function switchWeek(week) {
-        currentActiveWeek = week;
-        document.getElementById('btn-this').classList.toggle('active', week === 'this');
-        document.getElementById('btn-next').classList.toggle('active', week === 'next');
-        document.getElementById('planner-this').style.display = (week === 'this' ? 'table-row-group' : 'none');
-        document.getElementById('planner-next').style.display = (week === 'next' ? 'table-row-group' : 'none');
-        updateCalculations();
-    }
-
-    sb.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => {
-        loadAll();
-    }).subscribe();
-
+    sb.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => loadAll()).subscribe();
     window.onload = loadAll;
 </script>
 </body>
