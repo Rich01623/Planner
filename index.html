@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v4.9.5 (Supabase Sync)</title>
+    <title>FROST Transport Planner - v4.9.7</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -25,12 +25,11 @@
         .grand-total-box { background: var(--frost-black); color: white; padding: 5px 15px; border-radius: 6px; border-left: 4px solid var(--price-green); text-align: right; }
         .grand-total-value { font-size: 1.1rem; font-weight: bold; color: var(--whatsapp-green); }
 
-        /* Navigation Bar */
         .week-selector { background: #333; padding: 5px 10px; display: flex; gap: 8px; justify-content: center; }
         .week-btn { padding: 8px 25px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; text-decoration: none; font-size: 0.85rem; }
         .week-btn:hover { background: #777; }
         .week-btn.active { background: var(--frost-red); }
-        .pod-nav-btn { background: var(--frost-blue); } /* Distinct color for the POD folder */
+        .pod-nav-btn { background: var(--frost-blue); }
         .pod-nav-btn:hover { background: #004494; }
 
         main { display: grid; grid-template-columns: 280px 320px 1fr; flex-grow: 1; overflow: hidden; gap: 10px; padding: 10px; }
@@ -45,14 +44,14 @@
         .is-next-week .driver-cell { background: #e1ecf7; }
 
         table { width: 100%; border-collapse: collapse; min-width: 1250px; table-layout: fixed; }
-        th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 8px; font-size: 0.8rem; }
-        .day-total { background: var(--price-green); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; }
+        th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.9rem; text-transform: uppercase; }
+        .day-total { background: var(--price-green); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px; }
         
         .driver-cell { background: #eee; font-weight: bold; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); font-size: 0.85rem; }
         .driver-weekly-total { font-size: 0.7rem; color: #666; background: #ddd; padding: 2px 6px; border-radius: 4px; display: block; margin-top: 4px; width: fit-content; }
-        td { border: 1px solid var(--border-color); min-height: 110px; vertical-align: top; padding: 4px; }
+        td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
 
-        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
+        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; transition: background-color 0.5s ease; }
         .job-card.pod-complete { background: var(--pod-complete-blue) !important; border-left: 4px solid var(--frost-blue) !important; }
 
         .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
@@ -79,6 +78,8 @@
     </style>
 </head>
 <body>
+
+<audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <header>
     <div class="logo-container">
@@ -128,15 +129,12 @@
         <table id="main-table">
             <thead>
                 <tr>
-                    <th rowspan="2" style="width:160px;">Driver</th>
-                    <th colspan="2">Mon <span class="day-total" id="total-0">£0</span></th>
-                    <th colspan="2">Tue <span class="day-total" id="total-1">£0</span></th>
-                    <th colspan="2">Wed <span class="day-total" id="total-2">£0</span></th>
-                    <th colspan="2">Thu <span class="day-total" id="total-3">£0</span></th>
-                    <th colspan="2">Fri <span class="day-total" id="total-4">£0</span></th>
-                </tr>
-                <tr style="font-size:0.6rem; background:#444;">
-                    <th>AM</th><th>PM</th><th>AM</th><th>PM</th><th>AM</th><th>PM</th><th>AM</th><th>PM</th><th>AM</th><th>PM</th>
+                    <th style="width:160px;">Driver</th>
+                    <th>Mon <span class="day-total" id="total-0">£0</span></th>
+                    <th>Tue <span class="day-total" id="total-1">£0</span></th>
+                    <th>Wed <span class="day-total" id="total-2">£0</span></th>
+                    <th>Thu <span class="day-total" id="total-3">£0</span></th>
+                    <th>Fri <span class="day-total" id="total-4">£0</span></th>
                 </tr>
             </thead>
             <tbody id="planner-this"></tbody>
@@ -146,7 +144,6 @@
 </main>
 
 <script>
-    // INITIALIZE SUPABASE
     const _URL = "https://tdrzytgiqvdulityqttr.supabase.co";
     const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkcnp5dGdpcXZkdWxpdHlxdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTM5NTMsImV4cCI6MjA4ODcyOTk1M30.XN46i7u6STD-2afmN7-Jh1MltADGpEuWlLt_n7wknbA";
     const sb = supabase.createClient(_URL, _KEY);
@@ -167,7 +164,7 @@
         fleet.forEach((driver, i) => {
             let row = document.createElement('tr');
             row.innerHTML = `<td class="driver-cell"><span>${driver.name}</span><span class="driver-weekly-total" id="${boardId}-total-${i}">Week: £0</span></td>` + 
-                            Array(10).fill(0).map((_,j) => `<td id="${boardId}-dr${i}-s${j}" ondrop="drop(event)" ondragover="allowDrop(event)"></td>`).join('');
+                            Array(5).fill(0).map((_,j) => `<td id="${boardId}-dr${i}-s${j}" ondrop="drop(event)" ondragover="allowDrop(event)"></td>`).join('');
             board.appendChild(row);
         });
     });
@@ -175,7 +172,6 @@
     function allowDrop(ev) { ev.preventDefault(); }
     function drag(ev) { ev.dataTransfer.setData("text", ev.target.id); }
     
-    // UPDATED DROP FUNCTION WITH HANDSHAKE
     async function drop(ev) {
         ev.preventDefault();
         const id = ev.dataTransfer.getData("text");
@@ -186,12 +182,9 @@
         
         if (target.tagName === 'TD') {
             card.classList.add('on-board');
-            // SUPABASE HANDSHAKE: Update status to 'assigned' when dropped on the board
-            const { error } = await sb.from('quotes').update({ status: 'assigned' }).eq('id', id);
-            if(error) console.error("Handshake Failed:", error.message);
+            await sb.from('quotes').update({ status: 'assigned' }).eq('id', id);
         } else {
             card.classList.remove('on-board', 'expanded');
-            // SUPABASE HANDSHAKE: Reset status if moved back to unassigned pool
             await sb.from('quotes').update({ status: 'pending' }).eq('id', id);
         }
         
@@ -297,9 +290,11 @@
         let grand = 0; let dayTots = Array(5).fill(0);
         const boardId = 'planner-' + currentActiveWeek;
         fleet.forEach((_, i) => { if(document.getElementById(`${boardId}-total-${i}`)) document.getElementById(`${boardId}-total-${i}`).innerText = "Week: £0"; });
+        
         document.querySelectorAll(`#${boardId} td[id*="-s"]`).forEach(slot => {
             const drIdx = slot.id.split('-dr')[1].split('-s')[0];
-            const dayIdx = Math.floor(parseInt(slot.id.split('-s')[1])/2);
+            const dayIdx = parseInt(slot.id.split('-s')[1]);
+            
             slot.querySelectorAll('.data-price').forEach(p => {
                 const val = parseFloat(p.innerText) || 0;
                 grand += val; dayTots[dayIdx] += val;
@@ -330,9 +325,7 @@
         document.getElementById('last-roll-date').innerText = localStorage.getItem('lastRolloverDate') || 'Never';
     }
 
-    // UPDATED LOAD FUNCTION TO SYNC WITH SUPABASE REAL-TIME
     async function loadAll() {
-        // First load local storage as usual
         const saved = localStorage.getItem('frostPlanner_v495');
         if(saved) {
             const data = JSON.parse(saved);
@@ -343,7 +336,6 @@
             }); }
         }
 
-        // THEN: Fetch and insert any live orders from Supabase that aren't on board yet
         const { data: remoteQuotes } = await sb.from('quotes').select('*').eq('status', 'pending');
         if(remoteQuotes) {
             remoteQuotes.forEach(q => {
@@ -394,6 +386,20 @@
         const clone = createCardElement(c.querySelector('.data-cust').innerText, c.querySelector('.data-ref').innerText, c.querySelector('.data-time').innerText, c.querySelector('.data-pick').innerText, c.querySelector('.data-del').innerText, c.querySelector('.data-trail').innerText, c.querySelector('.data-price').innerText, c.querySelector('.data-notes').innerText, c.querySelector('.data-date').innerText, 'this', null, c.classList.contains('pod-complete'));
         document.getElementById('pool-container').appendChild(clone); saveAll(); updateCalculations();
     }
+
+    // REALTIME LISTENER FOR INSTANT REFRESH
+    sb.channel('live-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quotes' }, (payload) => {
+          const q = payload.new;
+          if(!document.getElementById(q.id)) {
+              const c = createCardElement(q.customer_name, q.reference, '00:00', q.pickup, q.delivery, 'TBC', q.total_price.toString(), q.notes, new Date().toISOString().split('T')[0], 'this', q.id, false);
+              document.getElementById('pool-container').appendChild(c);
+              document.getElementById('alert-sound').play().catch(() => {});
+              c.style.backgroundColor = "#fff3cd"; // Highlight
+              setTimeout(() => { c.style.backgroundColor = "white"; }, 3000);
+              saveAll(); updateCalculations();
+          }
+      }).subscribe();
 
     window.onload = loadAll;
 </script>
