@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v4.9.7</title>
+    <title>FROST Transport Planner - v4.9.8</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -29,19 +29,13 @@
         .week-btn { padding: 8px 25px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; text-decoration: none; font-size: 0.85rem; }
         .week-btn:hover { background: #777; }
         .week-btn.active { background: var(--frost-red); }
-        .pod-nav-btn { background: var(--frost-blue); }
-        .pod-nav-btn:hover { background: #004494; }
-
+        
         main { display: grid; grid-template-columns: 280px 320px 1fr; flex-grow: 1; overflow: hidden; gap: 10px; padding: 10px; }
         #data-input, #pending-pool, #planner-board { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; display: flex; flex-direction: column; }
         #pool-container { background: #e2e2e2; border: 2px dashed #999; flex-grow: 1; overflow-y: auto; padding: 8px; min-height: 100px; }
         
-        h2 { font-size: 1rem; border-bottom: 2px solid var(--frost-red); padding-bottom: 5px; margin-top: 0; text-transform: uppercase; }
-
         #planner-board { overflow: auto; padding: 0; transition: background 0.3s; }
         .is-next-week #planner-board { background: var(--next-week-bg); }
-        .is-next-week table thead th { background: var(--frost-blue); border-color: #004494; }
-        .is-next-week .driver-cell { background: #e1ecf7; }
 
         table { width: 100%; border-collapse: collapse; min-width: 1250px; table-layout: fixed; }
         th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.9rem; text-transform: uppercase; }
@@ -51,30 +45,21 @@
         .driver-weekly-total { font-size: 0.7rem; color: #666; background: #ddd; padding: 2px 6px; border-radius: 4px; display: block; margin-top: 4px; width: fit-content; }
         td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
 
-        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; transition: background-color 0.5s ease; }
+        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
         .job-card.pod-complete { background: var(--pod-complete-blue) !important; border-left: 4px solid var(--frost-blue) !important; }
-
-        .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; }
-        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; }
-        .wa-btn:hover { color: var(--whatsapp-green); }
-        .pod-btn:hover { color: var(--frost-blue); }
-        .mark-btn:hover { color: var(--price-green); }
-        .delete-btn:hover { color: var(--frost-red); }
-
         .card-row-2 { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; color: #000; }
-        .card-row-3 { display: flex; gap: 5px; }
-
+        
         .on-board .card-body { display: none; }
         .on-board.expanded .card-body { display: block; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
-
+        
+        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; margin-right: 5px; }
         .trailer-tag { background: #333; color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; }
         .price-tag { background: var(--price-green); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; }
 
         .form-group { margin-bottom: 10px; }
         label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; }
-        input, select, textarea { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        button#add-job { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        input, select, textarea { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        button#add-job { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -86,37 +71,29 @@
         <img src="logo.png" alt="FROST">
         <div class="grand-total-box">
             <span class="grand-total-value" id="grand-total">£0.00</span>
-            <div style="font-size:0.6rem; color:#888;">Refreshed: <span id="last-roll-date">Never</span></div>
         </div>
     </div>
-    <div style="display:flex; gap:10px;">
-        <button onclick="performRollover()" style="font-size:0.7rem; padding: 5px 10px; cursor:pointer; background: #ff9800; color:white; border:none; border-radius:4px; font-weight:bold;">ROLL WEEK NOW</button>
-        <button onclick="window.print()" style="padding: 5px 10px; cursor:pointer;">Print</button>
+    <div>
+        <button onclick="performRollover()" style="background:#ff9800; color:white; border:none; padding:5px 10px; border-radius:4px; font-weight:bold; cursor:pointer;">ROLL WEEK</button>
     </div>
 </header>
 
 <div class="week-selector">
-    <button class="week-btn active" id="btn-this" onclick="switchWeek('this')">THIS WEEK'S BOARD</button>
-    <button class="week-btn" id="btn-next" onclick="switchWeek('next')">NEXT WEEK'S BOARD</button>
-    <a href="https://drive.google.com/drive/folders/1FCaMhHMWnYWDdCDHc_Ssuo5u4rcmJMyo?usp=sharing" target="_blank" class="week-btn pod-nav-btn">PODs FOLDER</a>
+    <button class="week-btn active" id="btn-this" onclick="switchWeek('this')">THIS WEEK</button>
+    <button class="week-btn" id="btn-next" onclick="switchWeek('next')">NEXT WEEK</button>
 </div>
 
 <main id="main-container">
     <section id="data-input">
         <h2>Job Entry</h2>
-        <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Date</label><input type="date" id="job-date"></div>
-            <div class="form-group" style="flex:1;"><label>Time</label><input type="text" id="coll-time"></div>
-        </div>
-        <div class="form-group"><label>Customer Name</label><input type="text" id="cust-name"></div>
-        <div class="form-group"><label>Ref</label><input type="text" id="cust-ref"></div>
+        <div class="form-group"><label>Date</label><input type="date" id="job-date"></div>
+        <div class="form-group"><label>Customer</label><input type="text" id="cust-name"></div>
         <div class="form-group"><label>Pickup</label><input type="text" id="pickup"></div>
         <div class="form-group"><label>Delivery</label><input type="text" id="delivery"></div>
         <div style="display:flex; gap:5px;">
             <div class="form-group" style="flex:1;"><label>Trailer</label><input type="text" id="trailer-num"></div>
-            <div class="form-group" style="flex:1;"><label>Price (£)</label><input type="text" id="job-price"></div>
+            <div class="form-group" style="flex:1;"><label>Price</label><input type="text" id="job-price"></div>
         </div>
-        <div class="form-group"><label>Notes</label><textarea id="job-notes" style="height:40px;"></textarea></div>
         <button id="add-job" onclick="addNewJob()">Add Job</button>
     </section>
 
@@ -126,7 +103,7 @@
     </section>
 
     <section id="planner-board">
-        <table id="main-table">
+        <table>
             <thead>
                 <tr>
                     <th style="width:160px;">Driver</th>
@@ -157,8 +134,8 @@
     ];
 
     let currentActiveWeek = 'this';
-    document.getElementById('job-date').valueAsDate = new Date();
 
+    // Build Table Rows
     ['planner-this', 'planner-next'].forEach(boardId => {
         const board = document.getElementById(boardId);
         fleet.forEach((driver, i) => {
@@ -177,100 +154,56 @@
         const id = ev.dataTransfer.getData("text");
         const card = document.getElementById(id);
         const target = ev.currentTarget;
-        
         target.appendChild(card);
         
-        if (target.tagName === 'TD') {
-            card.classList.add('on-board');
-            await sb.from('quotes').update({ status: 'assigned' }).eq('id', id);
-        } else {
-            card.classList.remove('on-board', 'expanded');
-            await sb.from('quotes').update({ status: 'pending' }).eq('id', id);
-        }
-        
-        saveAll();
+        const isBoard = target.tagName === 'TD';
+        card.classList.toggle('on-board', isBoard);
+
+        // CLOUD UPDATE
+        const { error } = await sb.from('quotes').update({ 
+            status: isBoard ? 'assigned' : 'pending',
+            assigned_slot: isBoard ? target.id : null 
+        }).eq('id', id);
+
+        if(error) alert("Sync Error: " + error.message);
         updateCalculations();
     }
 
-    function switchWeek(week) {
-        currentActiveWeek = week;
-        document.getElementById('btn-this').classList.toggle('active', week === 'this');
-        document.getElementById('btn-next').classList.toggle('active', week === 'next');
-        const container = document.getElementById('main-container');
-        if (week === 'next') container.classList.add('is-next-week');
-        else container.classList.remove('is-next-week');
-        document.getElementById('planner-this').style.display = (week === 'this' ? 'table-row-group' : 'none');
-        document.getElementById('planner-next').style.display = (week === 'next' ? 'table-row-group' : 'none');
+    async function loadAll() {
+        // Clear current cards to prevent duplicates on refresh
+        document.querySelectorAll('.job-card').forEach(c => c.remove());
+
+        const { data: jobs, error } = await sb.from('quotes').select('*');
+        if (error) return console.error(error);
+
+        jobs.forEach(q => {
+            const card = createCardElement(q.customer_name, q.reference || '', '00:00', q.pickup || '', q.delivery || '', 'TBC', q.total_price || '0', q.notes || '', q.date || '', 'this', q.id, false);
+            
+            if (q.status === 'assigned' && q.assigned_slot) {
+                const slot = document.getElementById(q.assigned_slot);
+                if (slot) {
+                    card.classList.add('on-board');
+                    slot.appendChild(card);
+                } else {
+                    document.getElementById('pool-container').appendChild(card);
+                }
+            } else {
+                document.getElementById('pool-container').appendChild(card);
+            }
+        });
         updateCalculations();
     }
 
-    function sendWhatsApp(e, id) {
-        e.stopPropagation();
-        const card = document.getElementById(id);
-        const driverName = card.closest('tr')?.querySelector('.driver-cell span')?.innerText || "";
-        const driverObj = fleet.find(d => d.name === driverName);
-        if(!driverObj) return alert("Assign to a driver first!");
-        
-        const cust = card.querySelector('.data-cust').innerText;
-        const trail = card.querySelector('.data-trail').innerText;
-        const ref = card.querySelector('.data-ref').innerText;
-        const time = card.querySelector('.data-time').innerText;
-        const pick = card.querySelector('.data-pick').innerText;
-        const del = card.querySelector('.data-del').innerText;
-        const date = card.querySelector('.data-date').innerText;
-        const podLink = `https://script.google.com/macros/s/AKfycbzfVb0yx0XMJytLgyWJgqFPBi0U2brnecZXYGYW299YfG6EmNK-AFJcj5DahTWQl881/exec?jobid=${id}`;
-
-        const text = encodeURIComponent(`*FROST TRANSPORT*\nDate: ${date}\nCust: ${cust}\nRef: ${ref} | Time: ${time}\nPick: ${pick}\nDel: ${del}\nTrailer: ${trail}\n\nUPLOAD POD: ${podLink}`);
-        window.open(`https://wa.me/${driverObj.phone}?text=${text}`, '_blank');
-    }
-
-    function markPODReceived(e, id) {
-        e.stopPropagation();
-        const c = document.getElementById(id);
-        if(confirm(`Confirm POD received for ${id}?`)) {
-            c.classList.add('pod-complete');
-            saveAll();
-        }
-    }
-
-    function addNewJob() {
-        const cust = document.getElementById('cust-name').value;
-        const date = document.getElementById('job-date').value;
-        if(!cust || !date) return alert("Required: Customer & Date");
-        const targetWeek = (new Date(date) >= (new Date().setDate(new Date().getDate() + (1 + 7 - new Date().getDay()) % 7))) ? 'next' : 'this';
-        const card = createCardElement(cust, 
-            document.getElementById('cust-ref').value, 
-            document.getElementById('coll-time').value, 
-            document.getElementById('pickup').value, 
-            document.getElementById('delivery').value, 
-            document.getElementById('trailer-num').value, 
-            document.getElementById('job-price').value, 
-            document.getElementById('job-notes').value, 
-            date, targetWeek);
-        document.getElementById('pool-container').appendChild(card);
-        saveAll(); updateCalculations();
-        ['cust-name','cust-ref','coll-time','pickup','delivery','trailer-num','job-price','job-notes'].forEach(i => document.getElementById(i).value = '');
-    }
-
-    function createCardElement(cust, ref, time, pick, del, trail, price, notes, date, week, id = null, pod = false) {
+    function createCardElement(cust, ref, time, pick, del, trail, price, notes, date, week, id, pod) {
         const card = document.createElement('div');
-        const jobId = id || "J" + Math.floor(100000 + Math.random() * 900000);
         card.className = "job-card" + (pod ? " pod-complete" : "");
-        card.id = jobId;
+        card.id = id;
         card.draggable = true;
-        card.setAttribute('data-week', week);
         card.ondragstart = drag;
         card.onclick = function(e) { if(!e.target.classList.contains('action-btn')) this.classList.toggle('expanded'); };
         card.innerHTML = `
             <div class="card-row-1">
-                <div class="card-actions">
-                    <span class="action-btn wa-btn" onclick="sendWhatsApp(event, '${card.id}')">✆</span>
-                    <span class="action-btn pod-btn" onclick="event.stopPropagation(); window.open('https://drive.google.com/drive/search?q=${jobId}', '_blank')">📎</span>
-                    <span class="action-btn mark-btn" onclick="markPODReceived(event, '${card.id}')">✅</span>
-                    <span class="action-btn" onclick="duplicateCard(event, '${card.id}')">❏</span>
-                    <span class="action-btn" onclick="editCard(event, '${card.id}')">✎</span>
-                </div>
-                <span class="action-btn delete-btn" onclick="this.closest('.job-card').remove(); saveAll(); updateCalculations();">×</span>
+                <span class="action-btn" onclick="deleteJob('${id}')">×</span>
             </div>
             <div class="card-row-2 data-cust">${cust}</div>
             <div class="card-row-3">
@@ -278,19 +211,28 @@
                 <span class="price-tag">£<span class="data-price">${price}</span></span>
             </div>
             <div class="card-body">
-                <div style="font-size:0.6rem; color:#888;">ID: ${jobId} | <span class="data-date">${date}</span> | <span class="data-time">${time}</span></div>
-                <div>Ref: <span class="data-ref">${ref}</span></div>
-                <div><span class="data-pick">${pick}</span> ➔ <span class="data-del">${del}</span></div>
-                <div class="data-notes" style="font-style:italic; font-size:0.6rem;">${notes}</div>
+                <div>Pick: <span class="data-pick">${pick}</span></div>
+                <div>Del: <span class="data-del">${del}</span></div>
             </div>`;
         return card;
+    }
+
+    async function deleteJob(id) {
+        if(!confirm("Delete this job?")) return;
+        await sb.from('quotes').delete().eq('id', id);
+        document.getElementById(id).remove();
+        updateCalculations();
     }
 
     function updateCalculations() {
         let grand = 0; let dayTots = Array(5).fill(0);
         const boardId = 'planner-' + currentActiveWeek;
-        fleet.forEach((_, i) => { if(document.getElementById(`${boardId}-total-${i}`)) document.getElementById(`${boardId}-total-${i}`).innerText = "Week: £0"; });
         
+        fleet.forEach((_, i) => { 
+            const el = document.getElementById(`${boardId}-total-${i}`);
+            if(el) el.innerText = "Week: £0"; 
+        });
+
         document.querySelectorAll(`#${boardId} td[id*="-s"]`).forEach(slot => {
             const drIdx = slot.id.split('-dr')[1].split('-s')[0];
             const dayIdx = parseInt(slot.id.split('-s')[1]);
@@ -307,99 +249,22 @@
         dayTots.forEach((v,i) => document.getElementById('total-'+i).innerText = "£"+v.toFixed(2));
     }
 
-    function saveAll() {
-        const data = { pool: [], board: {} };
-        document.querySelectorAll('.job-card').forEach(card => {
-            const obj = {
-                id: card.id, cust: card.querySelector('.data-cust').innerText,
-                ref: card.querySelector('.data-ref').innerText, time: card.querySelector('.data-time').innerText,
-                date: card.querySelector('.data-date').innerText, pick: card.querySelector('.data-pick').innerText,
-                del: card.querySelector('.data-del').innerText, trail: card.querySelector('.data-trail').innerText,
-                price: card.querySelector('.data-price').innerText, notes: card.querySelector('.data-notes').innerText,
-                pod: card.classList.contains('pod-complete'), parentId: card.parentElement.id
-            };
-            if(obj.parentId === 'pool-container') data.pool.push(obj);
-            else { if(!data.board[obj.parentId]) data.board[obj.parentId] = []; data.board[obj.parentId].push(obj); }
-        });
-        localStorage.setItem('frostPlanner_v495', JSON.stringify(data));
-        document.getElementById('last-roll-date').innerText = localStorage.getItem('lastRolloverDate') || 'Never';
-    }
-
-    async function loadAll() {
-        const saved = localStorage.getItem('frostPlanner_v495');
-        if(saved) {
-            const data = JSON.parse(saved);
-            data.pool.forEach(d => document.getElementById('pool-container').appendChild(createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, 'this', d.id, d.pod)));
-            for(let slot in data.board) { data.board[slot].forEach(d => {
-                const c = createCardElement(d.cust, d.ref, d.time, d.pick, d.del, d.trail, d.price, d.notes, d.date, 'this', d.id, d.pod);
-                c.classList.add('on-board'); if(document.getElementById(slot)) document.getElementById(slot).appendChild(c);
-            }); }
-        }
-
-        const { data: remoteQuotes } = await sb.from('quotes').select('*').eq('status', 'pending');
-        if(remoteQuotes) {
-            remoteQuotes.forEach(q => {
-                if(!document.getElementById(q.id)) {
-                   const c = createCardElement(q.customer_name, q.reference, '00:00', q.pickup, q.delivery, 'TBC', q.total_price.toString(), q.notes, new Date().toISOString().split('T')[0], 'this', q.id, false);
-                   document.getElementById('pool-container').appendChild(c);
-                }
-            });
-        }
+    function switchWeek(week) {
+        currentActiveWeek = week;
+        document.getElementById('btn-this').classList.toggle('active', week === 'this');
+        document.getElementById('btn-next').classList.toggle('active', week === 'next');
+        document.getElementById('planner-this').style.display = (week === 'this' ? 'table-row-group' : 'none');
+        document.getElementById('planner-next').style.display = (week === 'next' ? 'table-row-group' : 'none');
         updateCalculations();
     }
 
-    function performRollover() {
-        if(!confirm("This will move NEXT WEEK into THIS WEEK. Proceed?")) return;
-        const saved = localStorage.getItem('frostPlanner_v495');
-        if(!saved) return;
-        const data = JSON.parse(saved);
-        const newBoard = {};
-        for (let slotId in data.board) {
-            if (slotId.startsWith('planner-next')) {
-                const newSlotId = slotId.replace('planner-next', 'planner-this');
-                newBoard[newSlotId] = data.board[slotId];
-            }
+    // REALTIME LISTENER
+    sb.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+            document.getElementById('alert-sound').play().catch(()=>{});
+            loadAll(); // Simple refresh on new job
         }
-        data.board = newBoard;
-        data.pool = data.pool.filter(j => j.week === 'next').map(j => ({ ...j, week: 'this' }));
-        localStorage.setItem('lastRolloverDate', new Date().toDateString());
-        localStorage.setItem('frostPlanner_v495', JSON.stringify(data));
-        location.reload(); 
-    }
-
-    function editCard(e, id) {
-        e.stopPropagation(); const c = document.getElementById(id);
-        document.getElementById('cust-name').value = c.querySelector('.data-cust').innerText;
-        document.getElementById('cust-ref').value = c.querySelector('.data-ref').innerText;
-        document.getElementById('pickup').value = c.querySelector('.data-pick').innerText;
-        document.getElementById('delivery').value = c.querySelector('.data-del').innerText;
-        document.getElementById('job-price').value = c.querySelector('.data-price').innerText;
-        document.getElementById('trailer-num').value = c.querySelector('.data-trail').innerText;
-        document.getElementById('coll-time').value = c.querySelector('.data-time').innerText;
-        document.getElementById('job-notes').value = c.querySelector('.data-notes').innerText;
-        document.getElementById('job-date').value = c.querySelector('.data-date').innerText;
-        c.remove(); saveAll(); updateCalculations();
-    }
-
-    function duplicateCard(e, id) {
-        e.stopPropagation(); const c = document.getElementById(id);
-        const clone = createCardElement(c.querySelector('.data-cust').innerText, c.querySelector('.data-ref').innerText, c.querySelector('.data-time').innerText, c.querySelector('.data-pick').innerText, c.querySelector('.data-del').innerText, c.querySelector('.data-trail').innerText, c.querySelector('.data-price').innerText, c.querySelector('.data-notes').innerText, c.querySelector('.data-date').innerText, 'this', null, c.classList.contains('pod-complete'));
-        document.getElementById('pool-container').appendChild(clone); saveAll(); updateCalculations();
-    }
-
-    // REALTIME LISTENER FOR INSTANT REFRESH
-    sb.channel('live-updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quotes' }, (payload) => {
-          const q = payload.new;
-          if(!document.getElementById(q.id)) {
-              const c = createCardElement(q.customer_name, q.reference, '00:00', q.pickup, q.delivery, 'TBC', q.total_price.toString(), q.notes, new Date().toISOString().split('T')[0], 'this', q.id, false);
-              document.getElementById('pool-container').appendChild(c);
-              document.getElementById('alert-sound').play().catch(() => {});
-              c.style.backgroundColor = "#fff3cd"; // Highlight
-              setTimeout(() => { c.style.backgroundColor = "white"; }, 3000);
-              saveAll(); updateCalculations();
-          }
-      }).subscribe();
+    }).subscribe();
 
     window.onload = loadAll;
 </script>
