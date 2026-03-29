@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v5.4.1</title>
+    <title>FROST Transport Planner - v5.4.5</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -18,6 +18,7 @@
             --whatsapp-green: #25D366;
             --price-green: #2e7d32;
             --pod-complete-blue: #e3f2fd;
+            --completed-grey: #d1d1d1;
         }
 
         body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--light-grey); }
@@ -49,27 +50,25 @@
         td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
 
         .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
-        .job-card.pod-complete { background: var(--pod-complete-blue) !important; border-left: 4px solid var(--frost-blue) !important; }
+        .job-card.job-completed-grey { background: var(--completed-grey) !important; border-left: 4px solid #888 !important; opacity: 0.75; cursor: default; }
 
         .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .card-actions { display: flex; gap: 8px; align-items: center; }
         .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; }
         .wa-btn:hover { color: var(--whatsapp-green); }
-        .mark-btn:hover { color: var(--price-green); }
-        .edit-btn:hover { color: var(--frost-blue); }
-        .delete-btn:hover { color: var(--frost-red); }
 
         .card-row-2 { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; color: #000; }
-        .card-row-3 { display: flex; gap: 5px; margin-bottom: 4px; }
+        .card-row-3 { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 4px; }
         .on-board .card-body { display: none; }
         .on-board.expanded .card-body { display: block; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
 
         .trailer-tag { background: #333; color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; }
+        .vehicle-tag { background: var(--frost-blue); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; }
         .price-tag { background: var(--price-green); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; }
 
         .form-group { margin-bottom: 10px; }
         label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; }
-        input, textarea { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        input, textarea, select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         button#add-job { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; }
     </style>
 </head>
@@ -82,15 +81,12 @@
             <span class="grand-total-value" id="grand-total">£0.00</span>
         </div>
     </div>
-    <div style="display:flex; gap:10px;">
-        <button onclick="window.print()" style="padding: 5px 10px; cursor:pointer;">Print Board</button>
-    </div>
 </header>
 
 <div class="week-selector">
     <button class="week-btn active" id="btn-this" onclick="switchView('this')">THIS WEEK</button>
     <button class="week-btn" id="btn-next" onclick="switchView('next')">NEXT WEEK</button>
-    <button class="week-btn nav-blue" id="btn-invoice" onclick="switchView('invoice')">INVOICING CENTER</button>
+    <button class="week-btn nav-blue" id="btn-invoice" onclick="switchView('invoice')">INVOICES</button>
     <a href="https://drive.google.com/drive/folders/1FCaMhHMWnYWDdCDHc_Ssuo5u4rcmJMyo?usp=sharing" target="_blank" class="week-btn nav-blue">PODs FOLDER</a>
 </div>
 
@@ -105,6 +101,17 @@
         <div class="form-group"><label>Ref</label><input type="text" id="cust-ref"></div>
         <div class="form-group"><label>Pickup</label><input type="text" id="pickup"></div>
         <div class="form-group"><label>Delivery</label><input type="text" id="delivery"></div>
+        
+        <div class="form-group">
+            <label>Vehicle Type</label>
+            <select id="vehicle-type">
+                <option value="Artic">Artic</option>
+                <option value="Rigid">Rigid</option>
+                <option value="7.5t">7.5t</option>
+                <option value="Van">Van</option>
+            </select>
+        </div>
+
         <div style="display:flex; gap:5px;">
             <div class="form-group" style="flex:1;"><label>Trailer</label><input type="text" id="trailer-num"></div>
             <div class="form-group" style="flex:1;"><label>Price (£)</label><input type="text" id="job-price"></div>
@@ -137,7 +144,7 @@
 
     <section id="invoicing-view" style="display:none;">
         <div class="batch-bar">
-            <div><strong>Invoicing Center</strong> | <span id="selected-count">0 jobs selected</span></div>
+            <div><strong>Invoices</strong> | <span id="selected-count">0 jobs selected</span></div>
             <div style="display:flex; gap:10px;">
                 <button onclick="generateIndividualInvoices()" style="background:var(--frost-blue); color:white; border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">1. DOWNLOAD PDFs</button>
                 <button onclick="markBatchAsBilled()" style="background:var(--frost-black); color:white; border:none; padding:8px 15px; border-radius:4px; font-weight:bold; cursor:pointer;">2. MARK AS BILLED & CLEAR</button>
@@ -193,6 +200,7 @@
         ev.preventDefault();
         const id = ev.dataTransfer.getData("text");
         const card = document.getElementById(id);
+        if(card.classList.contains('job-completed-grey')) return;
         const target = ev.currentTarget;
         target.appendChild(card);
         const isBoard = target.tagName === 'TD';
@@ -208,18 +216,19 @@
             allJobsRaw = jobs;
             const invoiceBody = document.getElementById('invoice-list-body');
             invoiceBody.innerHTML = ''; 
-
             jobs.forEach(q => {
                 if (q.status === 'billed') return;
                 const card = createCardElement(q);
-                
-                if (q.status === 'assigned' && q.assigned_slot) {
+                if ((q.status === 'assigned' || q.status === 'completed') && q.assigned_slot) {
                     const slot = document.getElementById(q.assigned_slot);
-                    if (slot) { card.classList.add('on-board'); slot.appendChild(card); }
+                    if (slot) { 
+                        card.classList.add('on-board'); 
+                        if(q.status === 'completed') { card.classList.add('job-completed-grey'); card.draggable = false; }
+                        slot.appendChild(card); 
+                    }
                 } else if (q.status === 'pending') {
                     document.getElementById('pool-container').appendChild(card);
                 }
-
                 if (q.status === 'completed') {
                     const row = document.createElement('tr');
                     row.innerHTML = `<td><input type="checkbox" class="inv-check" data-id="${q.id}" onchange="updateBatchTotal()"></td><td><strong>${q.customer_name}</strong></td><td>${q.reference}</td><td>${q.date}</td><td>£${q.total_price}</td><td><span style="color:var(--frost-blue); font-weight:bold;">READY</span></td><td><button onclick="window.open('https://drive.google.com/drive/search?q=${q.id}', '_blank')">View POD</button></td>`;
@@ -232,21 +241,28 @@
 
     function createCardElement(q) {
         const card = document.createElement('div');
-        card.className = "job-card" + (q.status === 'completed' ? " pod-complete" : "");
+        card.className = "job-card";
         card.id = q.id; card.draggable = true; card.ondragstart = drag;
         card.onclick = function(e) { if(!e.target.classList.contains('action-btn')) this.classList.toggle('expanded'); };
+        
+        const markAction = q.status !== 'completed' ? `<span class="action-btn mark-btn" title="Complete Job" onclick="markPODReceived(event, '${q.id}')">✅</span>` : '';
+        
+        // Vehicle Tag Logic
+        const vehTag = q.vehicle_type ? `<span class="vehicle-tag">${q.vehicle_type}</span>` : '';
+
         card.innerHTML = `
             <div class="card-row-1">
                 <div class="card-actions">
                     <span class="action-btn wa-btn" title="WhatsApp Driver" onclick="sendWhatsApp(event, '${q.id}')">✆</span>
                     <span class="action-btn pod-btn" title="View POD" onclick="event.stopPropagation(); window.open('https://drive.google.com/drive/search?q=${q.id}', '_blank')">📎</span>
-                    <span class="action-btn mark-btn" title="Complete Job" onclick="markPODReceived(event, '${q.id}')">✅</span>
+                    ${markAction}
                     <span class="action-btn edit-btn" title="Edit Job" onclick="editJob(event, '${q.id}')">✎</span>
                 </div>
                 <span class="action-btn delete-btn" onclick="deleteJob('${q.id}')">×</span>
             </div>
             <div class="card-row-2 data-cust">${q.customer_name}</div>
             <div class="card-row-3">
+                ${vehTag}
                 <span class="trailer-tag">T: <span class="data-trail">${q.trailer_num || 'TBC'}</span></span>
                 <span class="price-tag">£<span class="data-price">${q.total_price}</span></span>
             </div>
@@ -266,6 +282,7 @@
             customer_name: cust, date: date, time: document.getElementById('coll-time').value,
             reference: document.getElementById('cust-ref').value, pickup: document.getElementById('pickup').value,
             delivery: document.getElementById('delivery').value, trailer_num: document.getElementById('trailer-num').value,
+            vehicle_type: document.getElementById('vehicle-type').value, // NEW FIELD
             total_price: document.getElementById('job-price').value || "0", notes: document.getElementById('job-notes').value,
             status: 'pending'
         }]);
@@ -285,6 +302,7 @@
         document.getElementById('pickup').value = j.pickup || '';
         document.getElementById('delivery').value = j.delivery || '';
         document.getElementById('trailer-num').value = j.trailer_num || '';
+        document.getElementById('vehicle-type').value = j.vehicle_type || 'Artic';
         document.getElementById('job-price').value = j.total_price || '0';
         document.getElementById('job-notes').value = j.notes || '';
         sb.from('quotes').delete().eq('id', id).then(() => loadAll());
@@ -293,8 +311,6 @@
     function updateCalculations() {
         let grand = 0; let dayTots = [0,0,0,0,0];
         const boardId = 'planner-' + (currentActiveView === 'invoice' ? 'this' : currentActiveView);
-        
-        // Totals per day
         document.querySelectorAll(`#${boardId} td[id*="-s"]`).forEach(slot => {
             const dayIdx = parseInt(slot.id.split('-s')[1]);
             slot.querySelectorAll('.data-price').forEach(p => {
@@ -302,28 +318,23 @@
                 grand += val; dayTots[dayIdx] += val;
             });
         });
-
-        // Totals per driver row
         fleet.forEach((_, i) => {
             let driverSum = 0;
             document.querySelectorAll(`[id^="${boardId}-dr${i}-s"]`).forEach(slot => {
-                slot.querySelectorAll('.data-price').forEach(p => {
-                    driverSum += parseFloat(p.innerText) || 0;
-                });
+                slot.querySelectorAll('.data-price').forEach(p => { driverSum += parseFloat(p.innerText) || 0; });
             });
             const totalEl = document.getElementById(`${boardId}-total-${i}`);
             if(totalEl) totalEl.innerText = `Week: £${driverSum.toFixed(2)}`;
         });
-
         document.getElementById('grand-total').innerText = "£" + grand.toFixed(2);
         dayTots.forEach((v,i) => { if(document.getElementById('total-'+i)) document.getElementById('total-'+i).innerText = "£"+v.toFixed(2); });
     }
 
-    async function deleteJob(id) { if(confirm("Delete job?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); } }
+    async function deleteJob(id) { if(confirm("Permanently delete job?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); } }
 
     async function markPODReceived(e, id) {
         e.stopPropagation();
-        if(confirm(`Move to Invoicing?`)) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); }
+        if(confirm(`Move to Invoices?`)) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); }
     }
 
     function sendWhatsApp(e, id) {
@@ -363,9 +374,7 @@
         const selectedChecks = document.querySelectorAll('.inv-check:checked');
         if (selectedChecks.length === 0) return alert("Select jobs first!");
         if (confirm(`Mark ${selectedChecks.length} jobs as BILLED?`)) {
-            for (const cb of selectedChecks) {
-                await sb.from('quotes').update({ status: 'billed' }).eq('id', cb.dataset.id);
-            }
+            for (const cb of selectedChecks) { await sb.from('quotes').update({ status: 'billed' }).eq('id', cb.dataset.id); }
             loadAll();
         }
     }
@@ -379,16 +388,50 @@
             if (job) {
                 setTimeout(() => {
                     const doc = new jsPDF();
-                    doc.setFontSize(20); doc.setTextColor(193, 39, 45);
+                    doc.setFontSize(22); doc.setTextColor(193, 39, 45);
                     doc.text("FROST TRANSPORT", 14, 20);
+                    doc.setFontSize(10); doc.setTextColor(100);
+                    doc.text("Transport & Logistics Services", 14, 25);
+                    doc.setTextColor(0); doc.setFontSize(12); doc.setFont("helvetica", "bold");
+                    doc.text("INVOICE", 140, 20);
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+                    doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, 140, 25);
+                    doc.text(`Job ID: ${job.id.substring(0, 8)}`, 140, 30);
+                    doc.setFont("helvetica", "bold"); doc.text("BILL TO:", 14, 45);
+                    doc.setFont("helvetica", "normal"); doc.text(`${job.customer_name}`, 14, 50);
+                    if(job.reference) doc.text(`Ref: ${job.reference}`, 14, 55);
+
+                    const podUrl = `https://drive.google.com/drive/search?q=${job.id}`;
+                    const tableRows = [
+                        ["Job Date", job.date],
+                        ["Vehicle Type", job.vehicle_type || "N/A"],
+                        ["Pickup Location", job.pickup || "N/A"],
+                        ["Delivery Location", job.delivery || "N/A"],
+                        ["Trailer Number", job.trailer_num || "N/A"],
+                        ["Proof of Delivery", "CLICK HERE TO VIEW POD"],
+                        ["Additional Notes", job.notes || "No notes provided"]
+                    ];
+
                     doc.autoTable({
-                        startY: 30,
-                        head: [['Cust', 'Date', 'Price']],
-                        body: [[job.customer_name, job.date, "£"+job.total_price]],
-                        headStyles: { fillColor: [26, 26, 26] }
+                        startY: 65,
+                        head: [['Description', 'Details']],
+                        body: tableRows,
+                        theme: 'striped',
+                        headStyles: { fillColor: [26, 26, 26] },
+                        columnStyles: { 0: { fontStyle: 'bold', width: 50 }, 1: { width: 130 } },
+                        didDrawCell: (data) => {
+                            if (data.row.index === 4 && data.column.index === 1 && data.section === 'body') {
+                                doc.setTextColor(0, 86, 179);
+                                doc.textWithLink("CLICK HERE TO VIEW POD", data.cell.x + 2, data.cell.y + 7, { url: podUrl });
+                            }
+                        }
                     });
-                    doc.save(`Invoice_${job.customer_name}.pdf`);
-                }, index * 300);
+
+                    const finalY = doc.lastAutoTable.finalY + 10;
+                    doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(0);
+                    doc.text(`TOTAL DUE: £${job.total_price}`, 140, finalY + 5);
+                    doc.save(`Invoice_${job.customer_name}_${job.date}.pdf`);
+                }, index * 400);
             }
         });
     }
