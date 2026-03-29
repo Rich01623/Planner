@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - v4.9.8</title>
+    <title>FROST Transport Planner - v5.0.0</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -25,18 +25,18 @@
         .grand-total-box { background: var(--frost-black); color: white; padding: 5px 15px; border-radius: 6px; border-left: 4px solid var(--price-green); text-align: right; }
         .grand-total-value { font-size: 1.1rem; font-weight: bold; color: var(--whatsapp-green); }
 
-        .week-selector { background: #333; padding: 5px 10px; display: flex; gap: 8px; justify-content: center; }
+        .week-selector { background: #333; padding: 5px 10px; display: flex; gap: 8px; justify-content: center; align-items: center; }
         .week-btn { padding: 8px 25px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; text-decoration: none; font-size: 0.85rem; }
         .week-btn:hover { background: #777; }
         .week-btn.active { background: var(--frost-red); }
-        
+        .pod-nav-btn { background: var(--frost-blue); }
+        .pod-nav-btn:hover { background: #004494; }
+
         main { display: grid; grid-template-columns: 280px 320px 1fr; flex-grow: 1; overflow: hidden; gap: 10px; padding: 10px; }
         #data-input, #pending-pool, #planner-board { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; display: flex; flex-direction: column; }
         #pool-container { background: #e2e2e2; border: 2px dashed #999; flex-grow: 1; overflow-y: auto; padding: 8px; min-height: 100px; }
         
-        #planner-board { overflow: auto; padding: 0; transition: background 0.3s; }
-        .is-next-week #planner-board { background: var(--next-week-bg); }
-
+        #planner-board { overflow: auto; padding: 0; }
         table { width: 100%; border-collapse: collapse; min-width: 1250px; table-layout: fixed; }
         th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.9rem; text-transform: uppercase; }
         .day-total { background: var(--price-green); color: white; padding: 2px 6px; border-radius: 10px; font-size: 0.7rem; margin-left: 5px; }
@@ -47,19 +47,27 @@
 
         .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
         .job-card.pod-complete { background: var(--pod-complete-blue) !important; border-left: 4px solid var(--frost-blue) !important; }
+
+        .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .card-actions { display: flex; gap: 8px; align-items: center; }
+        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+        .wa-btn:hover { color: var(--whatsapp-green); }
+        .pod-btn:hover { color: var(--frost-blue); }
+        .mark-btn:hover { color: var(--price-green); }
+        .delete-btn:hover { color: var(--frost-red); }
+
         .card-row-2 { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; color: #000; }
-        
+        .card-row-3 { display: flex; gap: 5px; margin-bottom: 4px; }
         .on-board .card-body { display: none; }
         .on-board.expanded .card-body { display: block; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
-        
-        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; margin-right: 5px; }
+
         .trailer-tag { background: #333; color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; }
         .price-tag { background: var(--price-green); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; }
 
         .form-group { margin-bottom: 10px; }
         label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; }
-        input, select, textarea { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
-        button#add-job { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; }
+        input, textarea { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button#add-job { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -73,27 +81,34 @@
             <span class="grand-total-value" id="grand-total">£0.00</span>
         </div>
     </div>
-    <div>
+    <div style="display:flex; gap:10px;">
         <button onclick="performRollover()" style="background:#ff9800; color:white; border:none; padding:5px 10px; border-radius:4px; font-weight:bold; cursor:pointer;">ROLL WEEK</button>
+        <button onclick="window.print()" style="padding: 5px 10px; cursor:pointer;">Print</button>
     </div>
 </header>
 
 <div class="week-selector">
-    <button class="week-btn active" id="btn-this" onclick="switchWeek('this')">THIS WEEK</button>
-    <button class="week-btn" id="btn-next" onclick="switchWeek('next')">NEXT WEEK</button>
+    <button class="week-btn active" id="btn-this" onclick="switchWeek('this')">THIS WEEK'S BOARD</button>
+    <button class="week-btn" id="btn-next" onclick="switchWeek('next')">NEXT WEEK'S BOARD</button>
+    <a href="https://drive.google.com/drive/folders/1FCaMhHMWnYWDdCDHc_Ssuo5u4rcmJMyo?usp=sharing" target="_blank" class="week-btn pod-nav-btn">PODs FOLDER</a>
 </div>
 
 <main id="main-container">
     <section id="data-input">
         <h2>Job Entry</h2>
-        <div class="form-group"><label>Date</label><input type="date" id="job-date"></div>
-        <div class="form-group"><label>Customer</label><input type="text" id="cust-name"></div>
+        <div style="display:flex; gap:5px;">
+            <div class="form-group" style="flex:1;"><label>Date</label><input type="date" id="job-date"></div>
+            <div class="form-group" style="flex:1;"><label>Time</label><input type="text" id="coll-time"></div>
+        </div>
+        <div class="form-group"><label>Customer Name</label><input type="text" id="cust-name"></div>
+        <div class="form-group"><label>Ref</label><input type="text" id="cust-ref"></div>
         <div class="form-group"><label>Pickup</label><input type="text" id="pickup"></div>
         <div class="form-group"><label>Delivery</label><input type="text" id="delivery"></div>
         <div style="display:flex; gap:5px;">
             <div class="form-group" style="flex:1;"><label>Trailer</label><input type="text" id="trailer-num"></div>
-            <div class="form-group" style="flex:1;"><label>Price</label><input type="text" id="job-price"></div>
+            <div class="form-group" style="flex:1;"><label>Price (£)</label><input type="text" id="job-price"></div>
         </div>
+        <div class="form-group"><label>Notes</label><textarea id="job-notes" style="height:40px;"></textarea></div>
         <button id="add-job" onclick="addNewJob()">Add Job</button>
     </section>
 
@@ -134,8 +149,9 @@
     ];
 
     let currentActiveWeek = 'this';
+    document.getElementById('job-date').valueAsDate = new Date();
 
-    // Build Table Rows
+    // Init Board
     ['planner-this', 'planner-next'].forEach(boardId => {
         const board = document.getElementById(boardId);
         fleet.forEach((driver, i) => {
@@ -159,38 +175,28 @@
         const isBoard = target.tagName === 'TD';
         card.classList.toggle('on-board', isBoard);
 
-        // CLOUD UPDATE
-        const { error } = await sb.from('quotes').update({ 
+        await sb.from('quotes').update({ 
             status: isBoard ? 'assigned' : 'pending',
             assigned_slot: isBoard ? target.id : null 
         }).eq('id', id);
 
-        if(error) alert("Sync Error: " + error.message);
         updateCalculations();
     }
 
     async function loadAll() {
-        // Clear current cards to prevent duplicates on refresh
         document.querySelectorAll('.job-card').forEach(c => c.remove());
-
-        const { data: jobs, error } = await sb.from('quotes').select('*');
-        if (error) return console.error(error);
-
-        jobs.forEach(q => {
-            const card = createCardElement(q.customer_name, q.reference || '', '00:00', q.pickup || '', q.delivery || '', 'TBC', q.total_price || '0', q.notes || '', q.date || '', 'this', q.id, false);
-            
-            if (q.status === 'assigned' && q.assigned_slot) {
-                const slot = document.getElementById(q.assigned_slot);
-                if (slot) {
-                    card.classList.add('on-board');
-                    slot.appendChild(card);
+        const { data: jobs } = await sb.from('quotes').select('*');
+        if (jobs) {
+            jobs.forEach(q => {
+                const card = createCardElement(q.customer_name, q.reference, '00:00', q.pickup, q.delivery, 'TBC', q.total_price, q.notes, q.date, 'this', q.id, (q.status === 'completed'));
+                if (q.status === 'assigned' && q.assigned_slot) {
+                    const slot = document.getElementById(q.assigned_slot);
+                    if (slot) { card.classList.add('on-board'); slot.appendChild(card); }
                 } else {
                     document.getElementById('pool-container').appendChild(card);
                 }
-            } else {
-                document.getElementById('pool-container').appendChild(card);
-            }
-        });
+            });
+        }
         updateCalculations();
     }
 
@@ -203,7 +209,14 @@
         card.onclick = function(e) { if(!e.target.classList.contains('action-btn')) this.classList.toggle('expanded'); };
         card.innerHTML = `
             <div class="card-row-1">
-                <span class="action-btn" onclick="deleteJob('${id}')">×</span>
+                <div class="card-actions">
+                    <span class="action-btn wa-btn" onclick="sendWhatsApp(event, '${id}')">✆</span>
+                    <span class="action-btn pod-btn" onclick="event.stopPropagation(); window.open('https://drive.google.com/drive/search?q=${id}', '_blank')">📎</span>
+                    <span class="action-btn mark-btn" onclick="markPODReceived(event, '${id}')">✅</span>
+                    <span class="action-btn" onclick="duplicateCard(event, '${id}')">❏</span>
+                    <span class="action-btn" onclick="editCard(event, '${id}')">✎</span>
+                </div>
+                <span class="action-btn delete-btn" onclick="deleteJob('${id}')">×</span>
             </div>
             <div class="card-row-2 data-cust">${cust}</div>
             <div class="card-row-3">
@@ -211,32 +224,97 @@
                 <span class="price-tag">£<span class="data-price">${price}</span></span>
             </div>
             <div class="card-body">
-                <div>Pick: <span class="data-pick">${pick}</span></div>
-                <div>Del: <span class="data-del">${del}</span></div>
+                <div style="font-size:0.6rem; color:#888;"><span class="data-date">${date}</span> | <span class="data-time">${time}</span></div>
+                <div>Ref: <span class="data-ref">${ref}</span></div>
+                <div><span class="data-pick">${pick}</span> ➔ <span class="data-del">${del}</span></div>
+                <div class="data-notes" style="font-style:italic; font-size:0.6rem;">${notes}</div>
             </div>`;
         return card;
     }
 
+    async function addNewJob() {
+        const cust = document.getElementById('cust-name').value;
+        const date = document.getElementById('job-date').value;
+        if(!cust || !date) return alert("Required: Customer & Date");
+        
+        await sb.from('quotes').insert([{
+            customer_name: cust,
+            reference: document.getElementById('cust-ref').value,
+            pickup: document.getElementById('pickup').value,
+            delivery: document.getElementById('delivery').value,
+            total_price: document.getElementById('job-price').value || "0",
+            notes: document.getElementById('job-notes').value,
+            status: 'pending'
+        }]);
+
+        loadAll();
+        ['cust-name','cust-ref','coll-time','pickup','delivery','trailer-num','job-price','job-notes'].forEach(i => document.getElementById(i).value = '');
+    }
+
     async function deleteJob(id) {
-        if(!confirm("Delete this job?")) return;
+        if(!confirm("Delete job?")) return;
         await sb.from('quotes').delete().eq('id', id);
         document.getElementById(id).remove();
         updateCalculations();
     }
 
+    function sendWhatsApp(e, id) {
+        e.stopPropagation();
+        const card = document.getElementById(id);
+        const driverName = card.closest('tr')?.querySelector('.driver-cell span')?.innerText || "";
+        const driverObj = fleet.find(d => d.name === driverName);
+        if(!driverObj) return alert("Assign to a driver first!");
+        
+        const text = encodeURIComponent(`*FROST TRANSPORT*\nDate: ${card.querySelector('.data-date').innerText}\nCust: ${card.querySelector('.data-cust').innerText}\nRef: ${card.querySelector('.data-ref').innerText}\nPick: ${card.querySelector('.data-pick').innerText}\nDel: ${card.querySelector('.data-del').innerText}\nTrailer: ${card.querySelector('.data-trail').innerText}\n\nPOD: https://script.google.com/macros/s/AKfycbzfVb0yx0XMJytLgyWJgqFPBi0U2brnecZXYGYW299YfG6EmNK-AFJcj5DahTWQl881/exec?jobid=${id}`);
+        window.open(`https://wa.me/${driverObj.phone}?text=${text}`, '_blank');
+    }
+
+    async function markPODReceived(e, id) {
+        e.stopPropagation();
+        if(confirm(`Confirm POD received?`)) {
+            await sb.from('quotes').update({ status: 'completed' }).eq('id', id);
+            document.getElementById(id).classList.add('pod-complete');
+        }
+    }
+
+    function editCard(e, id) {
+        e.stopPropagation(); 
+        const c = document.getElementById(id);
+        document.getElementById('cust-name').value = c.querySelector('.data-cust').innerText;
+        document.getElementById('cust-ref').value = c.querySelector('.data-ref').innerText;
+        document.getElementById('pickup').value = c.querySelector('.data-pick').innerText;
+        document.getElementById('delivery').value = c.querySelector('.data-del').innerText;
+        document.getElementById('job-price').value = c.querySelector('.data-price').innerText;
+        document.getElementById('trailer-num').value = c.querySelector('.data-trail').innerText;
+        document.getElementById('coll-time').value = c.querySelector('.data-time').innerText;
+        document.getElementById('job-notes').value = c.querySelector('.data-notes').innerText;
+        document.getElementById('job-date').value = c.querySelector('.data-date').innerText;
+        deleteJob(id);
+    }
+
+    async function duplicateCard(e, id) {
+        e.stopPropagation(); 
+        const c = document.getElementById(id);
+        await sb.from('quotes').insert([{
+            customer_name: c.querySelector('.data-cust').innerText,
+            reference: c.querySelector('.data-ref').innerText,
+            pickup: c.querySelector('.data-pick').innerText,
+            delivery: c.querySelector('.data-del').innerText,
+            total_price: c.querySelector('.data-price').innerText,
+            notes: c.querySelector('.data-notes').innerText,
+            status: 'pending'
+        }]);
+        loadAll();
+    }
+
     function updateCalculations() {
         let grand = 0; let dayTots = Array(5).fill(0);
         const boardId = 'planner-' + currentActiveWeek;
+        fleet.forEach((_, i) => { if(document.getElementById(`${boardId}-total-${i}`)) document.getElementById(`${boardId}-total-${i}`).innerText = "Week: £0"; });
         
-        fleet.forEach((_, i) => { 
-            const el = document.getElementById(`${boardId}-total-${i}`);
-            if(el) el.innerText = "Week: £0"; 
-        });
-
         document.querySelectorAll(`#${boardId} td[id*="-s"]`).forEach(slot => {
             const drIdx = slot.id.split('-dr')[1].split('-s')[0];
             const dayIdx = parseInt(slot.id.split('-s')[1]);
-            
             slot.querySelectorAll('.data-price').forEach(p => {
                 const val = parseFloat(p.innerText) || 0;
                 grand += val; dayTots[dayIdx] += val;
@@ -246,7 +324,10 @@
             });
         });
         document.getElementById('grand-total').innerText = "£" + grand.toFixed(2);
-        dayTots.forEach((v,i) => document.getElementById('total-'+i).innerText = "£"+v.toFixed(2));
+        dayTots.forEach((v,i) => {
+            const el = document.getElementById('total-'+i);
+            if(el) el.innerText = "£"+v.toFixed(2);
+        });
     }
 
     function switchWeek(week) {
@@ -258,12 +339,8 @@
         updateCalculations();
     }
 
-    // REALTIME LISTENER
-    sb.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-            document.getElementById('alert-sound').play().catch(()=>{});
-            loadAll(); // Simple refresh on new job
-        }
+    sb.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => {
+        loadAll();
     }).subscribe();
 
     window.onload = loadAll;
