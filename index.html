@@ -91,17 +91,26 @@
 </div>
 
 <main id="main-container">
-    <section id="data-input">
+    <section id="data-input" style="overflow-y: auto;">
         <h2>Job Entry</h2>
         <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Date</label><input type="date" id="job-date"></div>
+            <div class="form-group" style="flex:1;"><label>Planner Date</label><input type="date" id="job-date"></div>
             <div class="form-group" style="flex:1;"><label>Time</label><input type="text" id="coll-time"></div>
         </div>
         <div class="form-group"><label>Customer Name</label><input type="text" id="cust-name"></div>
+        <div style="display:flex; gap:5px;">
+            <div class="form-group" style="flex:1;"><label>Cust Email</label><input type="email" id="cust-email"></div>
+            <div class="form-group" style="flex:1;"><label>Cust Phone</label><input type="text" id="cust-phone"></div>
+        </div>
         <div class="form-group"><label>Ref</label><input type="text" id="cust-ref"></div>
         <div class="form-group"><label>Pickup</label><input type="text" id="pickup"></div>
         <div class="form-group"><label>Delivery</label><input type="text" id="delivery"></div>
         
+        <div style="display:flex; gap:5px;">
+            <div class="form-group" style="flex:1;"><label>Coll Date</label><input type="date" id="col-date"></div>
+            <div class="form-group" style="flex:1;"><label>Del Date</label><input type="date" id="del-date"></div>
+        </div>
+
         <div class="form-group">
             <label>Vehicle Type</label>
             <select id="vehicle-type">
@@ -246,8 +255,6 @@
         card.onclick = function(e) { if(!e.target.classList.contains('action-btn')) this.classList.toggle('expanded'); };
         
         const markAction = q.status !== 'completed' ? `<span class="action-btn mark-btn" title="Complete Job" onclick="markPODReceived(event, '${q.id}')">✅</span>` : '';
-        
-        // Vehicle Tag Logic
         const vehTag = q.vehicle_type ? `<span class="vehicle-tag">${q.vehicle_type}</span>` : '';
 
         card.innerHTML = `
@@ -266,6 +273,13 @@
                 <span class="trailer-tag">T: <span class="data-trail">${q.trailer_num || 'TBC'}</span></span>
                 <span class="price-tag">£<span class="data-price">${q.total_price}</span></span>
             </div>
+            <div style="font-size: 0.65rem; color: #444; margin-top: 4px; line-height: 1.2;">
+                <div style="font-weight: bold; color: var(--frost-red);">Coll: ${q.col_date || 'N/A'} | Del: ${q.del_date || 'N/A'}</div>
+                <div>${q.customer_email || ''} ${q.customer_phone ? ' | ' + q.customer_phone : ''}</div>
+                <div style="font-style: italic; color: #666; border-top: 1px solid #eee; margin-top: 2px;">
+                    ${q.notes ? '📝 ' + q.notes : ''}
+                </div>
+            </div>
             <div class="card-body">
                 <div style="font-size:0.6rem; color:#888;"><span class="data-date">${q.date}</span> | Ref: <span class="data-ref">${q.reference || ''}</span></div>
                 <div><span class="data-pick">${q.pickup || ''}</span> ➔ <span class="data-del">${q.delivery || ''}</span></div>
@@ -276,14 +290,23 @@
     async function addNewJob() {
         const cust = document.getElementById('cust-name').value;
         const date = document.getElementById('job-date').value;
-        if(!cust || !date) return alert("Required: Customer & Date");
+        if(!cust || !date) return alert("Required: Customer & Planner Date");
 
         const { error } = await sb.from('quotes').insert([{
-            customer_name: cust, date: date, time: document.getElementById('coll-time').value,
-            reference: document.getElementById('cust-ref').value, pickup: document.getElementById('pickup').value,
-            delivery: document.getElementById('delivery').value, trailer_num: document.getElementById('trailer-num').value,
-            vehicle_type: document.getElementById('vehicle-type').value, // NEW FIELD
-            total_price: document.getElementById('job-price').value || "0", notes: document.getElementById('job-notes').value,
+            customer_name: cust, 
+            customer_email: document.getElementById('cust-email').value,
+            customer_phone: document.getElementById('cust-phone').value,
+            date: date, 
+            time: document.getElementById('coll-time').value,
+            col_date: document.getElementById('col-date').value,
+            del_date: document.getElementById('del-date').value,
+            reference: document.getElementById('cust-ref').value, 
+            pickup: document.getElementById('pickup').value,
+            delivery: document.getElementById('delivery').value, 
+            trailer_num: document.getElementById('trailer-num').value,
+            vehicle_type: document.getElementById('vehicle-type').value,
+            total_price: document.getElementById('job-price').value || "0", 
+            notes: document.getElementById('job-notes').value,
             status: 'pending'
         }]);
 
@@ -296,8 +319,12 @@
         const j = allJobsRaw.find(x => x.id == id);
         if(!j) return;
         document.getElementById('cust-name').value = j.customer_name;
+        document.getElementById('cust-email').value = j.customer_email || '';
+        document.getElementById('cust-phone').value = j.customer_phone || '';
         document.getElementById('job-date').value = j.date;
         document.getElementById('coll-time').value = j.time || '';
+        document.getElementById('col-date').value = j.col_date || '';
+        document.getElementById('del-date').value = j.del_date || '';
         document.getElementById('cust-ref').value = j.reference || '';
         document.getElementById('pickup').value = j.pickup || '';
         document.getElementById('delivery').value = j.delivery || '';
@@ -305,6 +332,7 @@
         document.getElementById('vehicle-type').value = j.vehicle_type || 'Artic';
         document.getElementById('job-price').value = j.total_price || '0';
         document.getElementById('job-notes').value = j.notes || '';
+        // Note: This logic deletes and re-adds on "Add Job". You might prefer a proper Update button, but keeping your original logic.
         sb.from('quotes').delete().eq('id', id).then(() => loadAll());
     }
 
