@@ -7,6 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
     <style>
         :root {
@@ -32,6 +33,7 @@
         .week-btn:hover { background: #777; }
         .week-btn.active { background: var(--frost-red); }
         .nav-blue { background: var(--frost-blue); }
+        .nav-green { background: var(--whatsapp-green); }
 
         main { display: grid; grid-template-columns: 320px 1fr; flex-grow: 1; overflow: hidden; gap: 10px; padding: 10px; }
         #left-col { display: flex; flex-direction: column; overflow: hidden; gap: 10px; }
@@ -50,14 +52,9 @@
         td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
 
         .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
-        .job-card.job-completed-grey { background: var(--completed-grey) !important; border-left: 4px solid #888 !important; opacity: 0.75; cursor: default; }
         .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .card-actions { display: flex; gap: 8px; align-items: center; }
         .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; text-decoration: none; }
-        .wa-btn:hover { color: var(--whatsapp-green); }
-        .copy-btn:hover { color: var(--frost-blue); }
-        .delete-btn:hover { color: var(--frost-red); }
-        .pod-btn:hover { color: #f39c12; }
         
         .card-body { display: none; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
         .expanded .card-body { display: block; }
@@ -124,7 +121,7 @@
 
         <section id="pending-pool">
             <h2 style="margin-top:0;">Unassigned</h2>
-            <div id="pool-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div >
+            <div id="pool-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
         </section>
     </section>
 
@@ -146,7 +143,10 @@
         <div style="padding:20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
                 <h2>Invoice Queue</h2>
-                <button class="week-btn nav-blue" onclick="generateBatchPDF()">GENERATE PDF FOR SELECTED</button>
+                <div style="display:flex; gap:10px;">
+                    <button class="week-btn nav-blue" onclick="generateBatchPDF(true)">GENERATE PDF</button>
+                    <button class="week-btn nav-green" onclick="submitInvoiceByEmail()">SUBMIT INVOICE</button>
+                </div>
             </div>
             <table class="invoice-table">
                 <thead>
@@ -164,9 +164,15 @@
 </main>
 
 <script>
+    // Supabase Config
     const _URL = "https://tdrzytgiqvdulityqttr.supabase.co";
     const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkcnp5dGdpcXZkdWxpdHlxdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTM5NTMsImV4cCI6MjA4ODcyOTk1M30.XN46i7u6STD-2afmN7-Jh1MltADGpEuWlLt_n7wknbA";
     const sb = supabase.createClient(_URL, _KEY);
+
+    // EmailJS Config (You must populate these from your dashboard)
+    (function(){
+        emailjs.init("YOUR_PUBLIC_KEY"); 
+    })();
 
     const fleet = [
         { name: "Andy West", phone: "447734369810" }, { name: "Callum Lee", phone: "447359390140" },
@@ -179,6 +185,7 @@
     let currentWeekOffset = 0;
     let allJobsRaw = [];
 
+    // Initialize UI
     ['planner-w0', 'planner-w1', 'planner-w2', 'planner-w3'].forEach((boardId) => {
         const board = document.getElementById(boardId);
         fleet.forEach((driver, i) => {
@@ -272,78 +279,85 @@
         return card;
     }
 
-    function openPOD(e, id) {
-        e.stopPropagation();
-        window.open(`https://drive.google.com/drive/search?q=${id}`, '_blank');
-    }
-
-    function renderInvoiceList() {
-        const body = document.getElementById('invoice-list-body');
-        body.innerHTML = '';
-        const completed = allJobsRaw.filter(j => j.status === 'completed');
-        completed.forEach(j => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><input type="checkbox" class="inv-check" value="${j.id}"></td>
-                <td><strong>${j.customer_name}</strong></td>
-                <td style="font-size:0.75rem;">${j.pickup} ➔ ${j.delivery}<br><small>${j.date}</small></td>
-                <td>£${j.total_price}</td>
-            `;
-            body.appendChild(tr);
-        });
-    }
-
-    function generateBatchPDF() {
+    function generateBatchPDF(shouldDownload = true) {
         const checked = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.value);
-        if (checked.length === 0) return alert("Select jobs first!");
+        if (checked.length === 0) {
+            alert("Select jobs first!");
+            return null;
+        }
+        
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.setFontSize(22);
         doc.setTextColor(193, 39, 45);
         doc.text("FROST Transport - Delivery Summary", 14, 20);
+        
         const rows = allJobsRaw.filter(j => checked.includes(j.id.toString())).map(j => [
             j.date, j.customer_name, `${j.pickup} to ${j.delivery}`, j.vehicle_type, `£${j.total_price}`
         ]);
+        
         doc.autoTable({
             startY: 35,
             head: [['Date', 'Customer', 'Route', 'Vehicle', 'Price']],
             body: rows,
             headStyles: { fillColor: [26, 26, 26] }
         });
-        doc.save(`FROST_Summary_${new Date().getTime()}.pdf`);
-    }
-
-    function toggleAllInvoices(master) {
-        document.querySelectorAll('.inv-check').forEach(cb => cb.checked = master.checked);
-    }
-
-    async function markPODReceived(e, id) {
-        e.stopPropagation();
-        if(confirm(`Move to Invoice Queue?`)) { 
-            await sb.from('quotes').update({ status: 'completed' }).eq('id', id); 
-            loadAll(); 
+        
+        if (shouldDownload) {
+            doc.save(`FROST_Summary_${new Date().getTime()}.pdf`);
         }
+        return doc;
     }
 
-    async function duplicateJob(e, id) {
-        e.stopPropagation();
-        const j = allJobsRaw.find(x => x.id == id);
-        const { id: _, created_at: __, assigned_slot: ___, ...newJob } = j;
-        newJob.status = 'pending';
-        await sb.from('quotes').insert([newJob]);
-        loadAll();
+    async function submitInvoiceByEmail() {
+        const doc = generateBatchPDF(false); // Generate but don't download
+        if (!doc) return;
+
+        const btn = event.target;
+        btn.innerText = "SENDING...";
+        btn.disabled = true;
+
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+        const templateParams = {
+            to_email: 'your-nominated-email@example.com', // CHANGE THIS
+            subject: 'New FROST Transport Invoice Batch',
+            content: 'Please find the attached invoice summary.',
+            attachment: pdfBase64
+        };
+
+        emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
+            .then(async function() {
+                alert('Invoice emailed successfully!');
+                // Optional: Update status in database to 'billed' so they disappear from queue
+                const checked = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.value);
+                await sb.from('quotes').update({ status: 'billed' }).in('id', checked);
+                loadAll();
+            }, function(error) {
+                alert('FAILED to send email: ' + JSON.stringify(error));
+            })
+            .finally(() => {
+                btn.innerText = "SUBMIT INVOICE";
+                btn.disabled = false;
+            });
     }
 
-    async function drop(ev) {
-        ev.preventDefault();
-        const id = ev.dataTransfer.getData("text");
-        const target = ev.currentTarget;
-        const isBoard = target.tagName === 'TD';
-        await sb.from('quotes').update({ status: isBoard ? 'assigned' : 'pending', assigned_slot: isBoard ? target.id : null }).eq('id', id);
-        loadAll();
-    }
-
+    // Standard CRUD and Helper Functions
+    function openPOD(e, id) { e.stopPropagation(); window.open(`https://drive.google.com/drive/search?q=${id}`, '_blank'); }
+    function toggleAllInvoices(master) { document.querySelectorAll('.inv-check').forEach(cb => cb.checked = master.checked); }
+    async function markPODReceived(e, id) { e.stopPropagation(); if(confirm(`Move to Invoice Queue?`)) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); } }
+    async function drop(ev) { ev.preventDefault(); const id = ev.dataTransfer.getData("text"); const target = ev.currentTarget; const isBoard = target.tagName === 'TD'; await sb.from('quotes').update({ status: isBoard ? 'assigned' : 'pending', assigned_slot: isBoard ? target.id : null }).eq('id', id); loadAll(); }
     function allowDrop(ev) { ev.preventDefault(); }
+    function renderInvoiceList() {
+        const body = document.getElementById('invoice-list-body');
+        body.innerHTML = '';
+        const completed = allJobsRaw.filter(j => j.status === 'completed');
+        completed.forEach(j => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><input type="checkbox" class="inv-check" value="${j.id}"></td><td><strong>${j.customer_name}</strong></td><td style="font-size:0.75rem;">${j.pickup} ➔ ${j.delivery}<br><small>${j.date}</small></td><td>£${j.total_price}</td>`;
+            body.appendChild(tr);
+        });
+    }
 
     function updateCalculations() {
         let grand = 0; let dayTots = [0,0,0,0,0];
@@ -380,40 +394,11 @@
             notes: document.getElementById('job-notes').value,
             status: 'pending'
         };
-        
-        // This is the fix: actually inserting into Supabase
         const { error } = await sb.from('quotes').insert([payload]);
-        
-        if (error) {
-            alert("Database Error: " + error.message);
-        } else {
-            loadAll(); 
-            toggleJobForm();
-            // Clear inputs
-            document.getElementById('cust-name').value = "";
-            document.getElementById('pickup').value = "";
-            document.getElementById('delivery').value = "";
-            document.getElementById('job-price').value = "";
-        }
+        if (!error) { loadAll(); toggleJobForm(); document.getElementById('cust-name').value = ""; }
     }
 
-    function editJob(e, id) {
-        e.stopPropagation();
-        const j = allJobsRaw.find(x => x.id == id);
-        document.getElementById('cust-name').value = j.customer_name;
-        document.getElementById('job-date').value = j.date;
-        document.getElementById('pickup').value = j.pickup;
-        document.getElementById('delivery').value = j.delivery;
-        document.getElementById('job-price').value = j.total_price;
-        if(document.getElementById('data-input').style.display !== 'flex') toggleJobForm();
-        sb.from('quotes').delete().eq('id', id).then(() => loadAll());
-    }
-
-    function toggleJobForm() {
-        const f = document.getElementById('data-input');
-        f.style.display = f.style.display === 'flex' ? 'none' : 'flex';
-    }
-
+    function toggleJobForm() { const f = document.getElementById('data-input'); f.style.display = f.style.display === 'flex' ? 'none' : 'flex'; }
     async function deleteJob(id) { if(confirm("Delete?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); } }
 
     function sendWhatsApp(e, id) {
