@@ -34,6 +34,7 @@
         .week-btn.active { background: var(--frost-red); }
         .nav-blue { background: var(--frost-blue); }
         .nav-green { background: var(--whatsapp-green); }
+        .nav-red { background: var(--frost-red); }
 
         main { display: grid; grid-template-columns: 320px 1fr; flex-grow: 1; overflow: hidden; gap: 10px; padding: 10px; }
         #left-col { display: flex; flex-direction: column; overflow: hidden; gap: 10px; }
@@ -146,6 +147,7 @@
                 <div style="display:flex; gap:10px;">
                     <button class="week-btn nav-blue" onclick="generateBatchPDF(true)">GENERATE PDF</button>
                     <button class="week-btn nav-green" onclick="submitInvoiceByEmail()">SUBMIT INVOICE</button>
+                    <button class="week-btn nav-red" onclick="deleteSelectedInvoices()">DELETE SELECTED</button>
                 </div>
             </div>
             <table class="invoice-table">
@@ -164,15 +166,9 @@
 </main>
 
 <script>
-    // Supabase Config
     const _URL = "https://tdrzytgiqvdulityqttr.supabase.co";
     const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkcnp5dGdpcXZkdWxpdHlxdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTM5NTMsImV4cCI6MjA4ODcyOTk1M30.XN46i7u6STD-2afmN7-Jh1MltADGpEuWlLt_n7wknbA";
     const sb = supabase.createClient(_URL, _KEY);
-
-    // EmailJS Config (You must populate these from your dashboard)
-    (function(){
-        emailjs.init("YOUR_PUBLIC_KEY"); 
-    })();
 
     const fleet = [
         { name: "Andy West", phone: "447734369810" }, { name: "Callum Lee", phone: "447359390140" },
@@ -185,7 +181,6 @@
     let currentWeekOffset = 0;
     let allJobsRaw = [];
 
-    // Initialize UI
     ['planner-w0', 'planner-w1', 'planner-w2', 'planner-w3'].forEach((boardId) => {
         const board = document.getElementById(boardId);
         fleet.forEach((driver, i) => {
@@ -281,73 +276,29 @@
 
     function generateBatchPDF(shouldDownload = true) {
         const checked = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.value);
-        if (checked.length === 0) {
-            alert("Select jobs first!");
-            return null;
-        }
-        
+        if (checked.length === 0) { alert("Select jobs first!"); return null; }
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
-        doc.setFontSize(22);
-        doc.setTextColor(193, 39, 45);
+        doc.setFontSize(22); doc.setTextColor(193, 39, 45);
         doc.text("FROST Transport - Delivery Summary", 14, 20);
-        
         const rows = allJobsRaw.filter(j => checked.includes(j.id.toString())).map(j => [
             j.date, j.customer_name, `${j.pickup} to ${j.delivery}`, j.vehicle_type, `£${j.total_price}`
         ]);
-        
-        doc.autoTable({
-            startY: 35,
-            head: [['Date', 'Customer', 'Route', 'Vehicle', 'Price']],
-            body: rows,
-            headStyles: { fillColor: [26, 26, 26] }
-        });
-        
-        if (shouldDownload) {
-            doc.save(`FROST_Summary_${new Date().getTime()}.pdf`);
-        }
+        doc.autoTable({ startY: 35, head: [['Date', 'Customer', 'Route', 'Vehicle', 'Price']], body: rows, headStyles: { fillColor: [26, 26, 26] } });
+        if (shouldDownload) doc.save(`FROST_Summary_${new Date().getTime()}.pdf`);
         return doc;
     }
 
-    async function submitInvoiceByEmail() {
-        const doc = generateBatchPDF(false); // Generate but don't download
-        if (!doc) return;
-
-        const btn = event.target;
-        btn.innerText = "SENDING...";
-        btn.disabled = true;
-
-        const pdfBase64 = doc.output('datauristring').split(',')[1];
-
-        const templateParams = {
-            to_email: 'your-nominated-email@example.com', // CHANGE THIS
-            subject: 'New FROST Transport Invoice Batch',
-            content: 'Please find the attached invoice summary.',
-            attachment: pdfBase64
-        };
-
-        emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
-            .then(async function() {
-                alert('Invoice emailed successfully!');
-                // Optional: Update status in database to 'billed' so they disappear from queue
-                const checked = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.value);
-                await sb.from('quotes').update({ status: 'billed' }).in('id', checked);
-                loadAll();
-            }, function(error) {
-                alert('FAILED to send email: ' + JSON.stringify(error));
-            })
-            .finally(() => {
-                btn.innerText = "SUBMIT INVOICE";
-                btn.disabled = false;
-            });
+    async function deleteSelectedInvoices() {
+        const checked = Array.from(document.querySelectorAll('.inv-check:checked')).map(cb => cb.value);
+        if (checked.length === 0) return alert("Select jobs to delete!");
+        if (confirm(`Are you sure you want to permanently delete these ${checked.length} jobs?`)) {
+            const { error } = await sb.from('quotes').delete().in('id', checked);
+            if (error) alert("Error deleting: " + error.message);
+            else loadAll();
+        }
     }
 
-    // Standard CRUD and Helper Functions
-    function openPOD(e, id) { e.stopPropagation(); window.open(`https://drive.google.com/drive/search?q=${id}`, '_blank'); }
-    function toggleAllInvoices(master) { document.querySelectorAll('.inv-check').forEach(cb => cb.checked = master.checked); }
-    async function markPODReceived(e, id) { e.stopPropagation(); if(confirm(`Move to Invoice Queue?`)) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); } }
-    async function drop(ev) { ev.preventDefault(); const id = ev.dataTransfer.getData("text"); const target = ev.currentTarget; const isBoard = target.tagName === 'TD'; await sb.from('quotes').update({ status: isBoard ? 'assigned' : 'pending', assigned_slot: isBoard ? target.id : null }).eq('id', id); loadAll(); }
-    function allowDrop(ev) { ev.preventDefault(); }
     function renderInvoiceList() {
         const body = document.getElementById('invoice-list-body');
         body.innerHTML = '';
@@ -358,6 +309,34 @@
             body.appendChild(tr);
         });
     }
+
+    async function addNewJob() {
+        const payload = {
+            customer_name: document.getElementById('cust-name').value,
+            date: document.getElementById('job-date').value,
+            time: document.getElementById('coll-time').value,
+            pickup: document.getElementById('pickup').value,
+            delivery: document.getElementById('delivery').value,
+            trailer_num: document.getElementById('trailer-num').value,
+            total_price: document.getElementById('job-price').value || "0",
+            vehicle_type: document.getElementById('vehicle-type').value,
+            notes: document.getElementById('job-notes').value,
+            status: 'pending'
+        };
+        const { error } = await sb.from('quotes').insert([payload]);
+        if (!error) { loadAll(); toggleJobForm(); document.getElementById('cust-name').value = ""; }
+    }
+
+    async function drop(ev) {
+        ev.preventDefault();
+        const id = ev.dataTransfer.getData("text");
+        const target = ev.currentTarget;
+        const isBoard = target.tagName === 'TD';
+        await sb.from('quotes').update({ status: isBoard ? 'assigned' : 'pending', assigned_slot: isBoard ? target.id : null }).eq('id', id);
+        loadAll();
+    }
+
+    function allowDrop(ev) { ev.preventDefault(); }
 
     function updateCalculations() {
         let grand = 0; let dayTots = [0,0,0,0,0];
@@ -381,26 +360,20 @@
         dayTots.forEach((v,i) => { if(document.getElementById('total-'+i)) document.getElementById('total-'+i).innerText = "£"+v.toFixed(2); });
     }
 
-    async function addNewJob() {
-        const payload = {
-            customer_name: document.getElementById('cust-name').value,
-            date: document.getElementById('job-date').value,
-            time: document.getElementById('coll-time').value,
-            pickup: document.getElementById('pickup').value,
-            delivery: document.getElementById('delivery').value,
-            trailer_num: document.getElementById('trailer-num').value,
-            total_price: document.getElementById('job-price').value || "0",
-            vehicle_type: document.getElementById('vehicle-type').value,
-            notes: document.getElementById('job-notes').value,
-            status: 'pending'
-        };
-        const { error } = await sb.from('quotes').insert([payload]);
-        if (!error) { loadAll(); toggleJobForm(); document.getElementById('cust-name').value = ""; }
-    }
-
+    // Boilerplate helpers
+    function openPOD(e, id) { e.stopPropagation(); window.open(`https://drive.google.com/drive/search?q=${id}`, '_blank'); }
+    function toggleAllInvoices(master) { document.querySelectorAll('.inv-check').forEach(cb => cb.checked = master.checked); }
+    async function markPODReceived(e, id) { e.stopPropagation(); if(confirm(`Move to Invoice Queue?`)) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); } }
     function toggleJobForm() { const f = document.getElementById('data-input'); f.style.display = f.style.display === 'flex' ? 'none' : 'flex'; }
     async function deleteJob(id) { if(confirm("Delete?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); } }
-
+    async function duplicateJob(e, id) {
+        e.stopPropagation();
+        const j = allJobsRaw.find(x => x.id == id);
+        const { id: _, created_at: __, assigned_slot: ___, ...newJob } = j;
+        newJob.status = 'pending';
+        await sb.from('quotes').insert([newJob]);
+        loadAll();
+    }
     function sendWhatsApp(e, id) {
         e.stopPropagation();
         const j = allJobsRaw.find(x => x.id == id);
