@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FROST Transport Planner - 4 Week Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - 4 Week Edition</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 
@@ -27,14 +20,10 @@
             --sidebar-width: 320px;
         }
 
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--light-grey); overflow: hidden; transition: background 0.3s; }
-        
-        /* Default Night Mode Styling */
-        body:not(.day-mode) { background: #121212; color: #eee; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--light-grey); overflow: hidden; }
         body.day-mode { background: #fff; color: #000; }
         
         header { background: white; padding: 10px 20px; border-bottom: 3px solid var(--frost-red); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; }
-        body:not(.day-mode) header { background: #1a1a1a; }
         .logo-container img { height: 50px; }
         
         .grand-total-box { background: var(--frost-black); color: white; padding: 5px 15px; border-radius: 6px; border-left: 4px solid var(--price-green); text-align: right; }
@@ -43,46 +32,37 @@
         .week-selector { background: #333; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 90; }
         .menu-group { display: flex; gap: 8px; align-items: center; }
 
-        /* Unified Button Styling */
-        .week-btn { padding: 8px 18px; border: none; background: var(--frost-blue); color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; font-size: 0.8rem; }
-        .week-btn:hover { filter: brightness(1.2); }
+        .week-btn { padding: 8px 18px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; font-size: 0.8rem; }
+        .week-btn:hover { background: #777; }
         .week-btn.active { background: var(--frost-red); }
         .week-btn.drag-over { background: var(--whatsapp-green) !important; transform: scale(1.05); }
+        
+        .nav-blue { background: var(--frost-blue); }
+        .nav-orange { background: #e67e22; }
 
         main { display: flex; flex-grow: 1; overflow: hidden; position: relative; width: 100%; }
 
         #unassigned-sidebar { width: var(--sidebar-width); background: #eee; border-right: 2px solid #ddd; display: flex; flex-direction: column; transition: margin-left 0.3s ease; margin-left: calc(-1 * var(--sidebar-width)); flex-shrink: 0; z-index: 80; }
         #unassigned-sidebar.open { margin-left: 0; }
-        body:not(.day-mode) #unassigned-sidebar { background: #1e1e1e; border-color: #333; }
-        
-        .sidebar-header { background: #ddd; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; color: #000; }
-        body:not(.day-mode) .sidebar-header { background: #333; color: white; }
-
+        .sidebar-header { background: #ddd; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         #pool-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: #e2e2e2; border: 2px dashed #bbb; margin: 10px; border-radius: 6px; min-height: 100px; }
-        body:not(.day-mode) #pool-container { background: #2a2a2a; border-color: #444; }
 
         #content-area { flex-grow: 1; overflow: hidden; padding: 10px; }
         #planner-board, #invoicing-view { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: 100%; overflow: auto; }
-        body:not(.day-mode) #planner-board, body:not(.day-mode) #invoicing-view { background: #1e1e1e; }
         
         table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
         th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.85rem; text-transform: uppercase; text-align: left; position: sticky; top: 0; z-index: 5; }
-        .driver-cell { background: #eee; font-weight: bold; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); font-size: 0.85rem; position: sticky; left: 0; z-index: 2; color: #000; }
-        body:not(.day-mode) .driver-cell { background: #2a2a2a; color: white; }
-
+        .driver-cell { background: #eee; font-weight: bold; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); font-size: 0.85rem; position: sticky; left: 0; z-index: 2; }
         .driver-weekly-total { font-size: 0.7rem; color: #666; background: #ddd; padding: 2px 6px; border-radius: 4px; display: block; margin-top: 4px; width: fit-content; }
-        body:not(.day-mode) .driver-weekly-total { background: #444; color: #bbb; }
-
         td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
-        body:not(.day-mode) td { border-color: #333; }
 
-        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; color: #000; position: relative; }
+        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
         .completed-card { background: #e0e0e0 !important; border-left: 4px solid #888 !important; opacity: 0.7; cursor: default !important; }
+        .completed-card .action-btn:not(.delete-btn) { display: none !important; }
         
         .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .card-actions { display: flex; gap: 6px; align-items: center; }
-        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; transition: 0.2s; }
-        .action-btn:hover { color: var(--frost-red); }
+        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; }
         .card-body { display: none; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
         .expanded .card-body { display: block; }
 
@@ -92,10 +72,9 @@
         .invoice-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .invoice-table th { background: #f8f8f8; color: #333; border: 1px solid #ddd; padding: 12px; font-size: 0.8rem; }
         .invoice-table td { border-bottom: 1px solid #eee; padding: 12px; font-size: 0.85rem; }
-        body:not(.day-mode) .invoice-table th { background: #333; color: #fff; border-color: #444; }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 400px; max-height: 85vh; overflow-y: auto; position: relative; color: #000; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 400px; max-height: 85vh; overflow-y: auto; position: relative; }
         .modal-close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #999; }
         .form-group { margin-bottom: 10px; }
         label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; }
@@ -103,20 +82,20 @@
         button#add-job-btn { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; }
     </style>
 </head>
-<body class="night-mode">
+<body>
 
 <header>
     <div class="logo-container"><img src="logo.png" alt="FROST"></div>
     <div style="display:flex; gap:15px; align-items:center;">
-        <button class="week-btn" style="background:#555" onclick="document.body.classList.toggle('day-mode')">Day/Night</button>
+        <button class="week-btn" onclick="document.body.classList.toggle('day-mode')">Day/Night</button>
         <div class="grand-total-box"><span class="grand-total-value" id="grand-total">£0.00</span></div>
     </div>
 </header>
 
 <div class="week-selector">
     <div class="menu-group">
-        <button class="week-btn" id="btn-toggle-pool" onclick="toggleUnassigned()" ondragover="handleBtnDragOver(event, 'pool')" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'pool')">UNASSIGNED</button>
-        <button class="week-btn" onclick="openModal('modal-add')">+ NEW JOB</button>
+        <button class="week-btn nav-orange" id="btn-toggle-pool" onclick="toggleUnassigned()" ondragover="handleBtnDragOver(event, 'pool')" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'pool')">UNASSIGNED</button>
+        <button class="week-btn nav-orange" onclick="openModal('modal-add')">+ NEW JOB</button>
     </div>
 
     <div class="menu-group">
@@ -127,8 +106,8 @@
     </div>
 
     <div class="menu-group">
-        <button class="week-btn" id="btn-invoice-nav" onclick="switchView('invoice')">INVOICES</button>
-        <button class="week-btn" onclick="window.open('https://drive.google.com/drive/folders/173z9mkrCmqmEyEENeH__-qvdw1SFJl7w?usp=sharing', '_blank')">POD DRIVE</button>
+        <button class="week-btn nav-blue" id="btn-invoice-nav" onclick="switchView('invoice')">INVOICES</button>
+        <button class="week-btn nav-blue" onclick="window.open('https://drive.google.com/drive/folders/173z9mkrCmqmEyEENeH__-qvdw1SFJl7w?usp=sharing', '_blank')">POD DRIVE</button>
     </div>
 </div>
 
@@ -153,8 +132,8 @@
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h2>Invoice Queue</h2>
                 <div style="display:flex; gap:10px;">
-                    <button class="week-btn" onclick="generateBatchPDF()">GENERATE PDF</button>
-                    <button class="week-btn" style="background:var(--frost-red)" onclick="markAsBilled()">MARK AS BILLED</button>
+                    <button class="week-btn nav-blue" onclick="generateBatchPDF()">GENERATE PDF</button>
+                    <button class="week-btn nav-orange" onclick="markAsBilled()">MARK AS BILLED</button>
                 </div>
             </div>
             <table class="invoice-table">
@@ -199,6 +178,7 @@
     let allJobsRaw = [];
     let hoverTimer = null;
 
+    // Table Generation
     ['planner-w0', 'planner-w1', 'planner-w2', 'planner-w3'].forEach((boardId) => {
         const board = document.getElementById(boardId);
         fleet.forEach((driver, i) => {
@@ -241,11 +221,11 @@
         card.innerHTML = `
             <div class="card-row-1">
                 <div class="card-actions">
-                    <span class="action-btn" title="WhatsApp" onclick="sendWhatsApp(event, '${q.id}')">✆</span>
-                    <span class="action-btn" title="Edit" onclick="editJob(event, '${q.id}')">✎</span>
-                    <span class="action-btn" title="Duplicate" onclick="duplicateJob(event, '${q.id}')">❐</span>
-                    <span class="action-btn" title="View POD" onclick="openPOD(event, '${q.id}')">📎</span>
-                    <span class="action-btn" title="Complete" onclick="markPODReceived(event, '${q.id}')">✅</span>
+                    <span class="action-btn" onclick="sendWhatsApp(event, '${q.id}')">✆</span>
+                    <span class="action-btn" onclick="editJob(event, '${q.id}')">✎</span>
+                    <span class="action-btn" onclick="duplicateJob(event, '${q.id}')">❐</span>
+                    <span class="action-btn" onclick="openPOD(event, '${q.id}')">📎</span>
+                    <span class="action-btn" onclick="markPODReceived(event, '${q.id}')">✅</span>
                 </div>
                 <span class="action-btn delete-btn" onclick="deleteJob('${q.id}')">×</span>
             </div>
@@ -263,7 +243,7 @@
         body.innerHTML = "";
         allJobsRaw.filter(j => j.status === 'completed').forEach(j => {
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><input type="checkbox" class="inv-check" data-id="${j.id}"></td><td>${j.date}</td><td>${j.customer_name}</td><td>${j.pickup} - ${j.delivery}</td><td>£${parseFloat(j.total_price).toFixed(2)}</td>`;
+            tr.innerHTML = `<td><input type="checkbox" class="inv-check" data-id="${j.id}"></td><td>${j.date}</td><td>${j.customer_name}</td><td>${j.pickup} - ${j.delivery}</td><td>£${j.total_price}</td>`;
             body.appendChild(tr);
         });
     }
@@ -332,8 +312,8 @@
         const j = allJobsRaw.find(x => x.id == id);
         const dr = document.getElementById(id).closest('tr')?.querySelector('.driver-cell span')?.innerText;
         const driver = fleet.find(d => d.name === dr);
-        if(!driver) return alert("Assign a driver first!");
-        const message = `FROST TRANSPORT\nJob: ${j.pickup} to ${j.delivery}\nUpload POD: ${podFolder}&jobid=${id}`;
+        if(!driver) return alert("Assign a driver!");
+        const message = `FROST TRANSPORT\nJob: ${j.pickup} to ${j.delivery}\nUpload POD here: ${podFolder}&jobid=${id}`;
         window.open(`https://wa.me/${driver.phone}?text=${encodeURIComponent(message)}`, '_blank');
     }
 
@@ -398,416 +378,6 @@
     function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('edit-id').value = ''; }
     function closeModalOnOutsideClick(e, id) { if(e.target.id === id) closeModal(id); }
     function toggleAllInvoices(m) { document.querySelectorAll('.inv-check').forEach(cb => cb.checked = m.checked); }
-
-    window.onload = () => { switchView(0); loadAll(); };
-    sb.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => loadAll()).subscribe();
-</script>
-</body>
-</html>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-
-    <style>
-        :root {
-            --frost-red: #c1272d;
-            --frost-black: #1a1a1a;
-            --frost-blue: #0056b3; 
-            --light-grey: #f4f4f4;
-            --border-color: #ccc;
-            --whatsapp-green: #25D366;
-            --price-green: #2e7d32;
-            --sidebar-width: 320px;
-        }
-
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--light-grey); overflow: hidden; }
-        header { background: white; padding: 10px 20px; border-bottom: 3px solid var(--frost-red); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; }
-        .logo-container img { height: 50px; }
-        .grand-total-box { background: var(--frost-black); color: white; padding: 5px 15px; border-radius: 6px; border-left: 4px solid var(--price-green); text-align: right; }
-        .grand-total-value { font-size: 1.1rem; font-weight: bold; color: var(--whatsapp-green); }
-
-        .week-selector { background: #333; padding: 8px; display: flex; gap: 8px; justify-content: center; align-items: center; flex-shrink: 0; z-index: 90; }
-        .week-btn { padding: 8px 18px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s; font-size: 0.8rem; }
-        .week-btn:hover { background: #777; }
-        .week-btn.active { background: var(--frost-red); }
-        .week-btn.drag-over { background: var(--whatsapp-green) !important; transform: scale(1.05); }
-        .nav-blue { background: var(--frost-blue); }
-        .nav-orange { background: #e67e22; }
-
-        main { display: flex; flex-grow: 1; overflow: hidden; position: relative; width: 100%; }
-
-        #unassigned-sidebar { 
-            width: var(--sidebar-width); 
-            background: #eee; 
-            border-right: 2px solid #ddd; 
-            display: flex; 
-            flex-direction: column; 
-            transition: margin-left 0.3s ease;
-            margin-left: calc(-1 * var(--sidebar-width)); 
-            flex-shrink: 0;
-            z-index: 80;
-        }
-        #unassigned-sidebar.open { margin-left: 0; }
-        .sidebar-header { background: #ddd; padding: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        #pool-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: #e2e2e2; border: 2px dashed #bbb; margin: 10px; border-radius: 6px; }
-
-        #content-area { flex-grow: 1; overflow: hidden; padding: 10px; }
-        #planner-board { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); height: 100%; overflow: auto; }
-        
-        table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
-        th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; font-size: 0.85rem; text-transform: uppercase; text-align: left; position: sticky; top: 0; z-index: 5; }
-        
-        .driver-cell { background: #eee; font-weight: bold; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); font-size: 0.85rem; position: sticky; left: 0; z-index: 2; }
-        .driver-weekly-total { font-size: 0.7rem; color: #666; background: #ddd; padding: 2px 6px; border-radius: 4px; display: block; margin-top: 4px; width: fit-content; }
-        td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
-
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 400px; max-height: 85vh; overflow-y: auto; position: relative; }
-        .modal-close { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #999; }
-
-        .job-card { background: white; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; position: relative; }
-        .card-row-1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .card-actions { display: flex; gap: 6px; align-items: center; }
-        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; line-height: 1; transition: 0.2s; }
-        .action-btn:hover { color: var(--frost-red); }
-        
-        .card-body { display: none; margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px; }
-        .expanded .card-body { display: block; }
-
-        .vehicle-tag { background: var(--frost-blue); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; }
-        .price-tag { background: var(--price-green); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: bold; }
-
-        .form-group { margin-bottom: 10px; }
-        label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; }
-        input, textarea, select { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button#add-job { width: 100%; background: var(--frost-red); color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 4px; }
-    </style>
-</head>
-<body>
-
-<header>
-    <div class="logo-container"><img src="logo.png" alt="FROST"></div>
-    <div class="grand-total-box">
-        <span class="grand-total-value" id="grand-total">£0.00</span>
-    </div>
-</header>
-
-<div class="week-selector">
-    <button class="week-btn active" id="btn-w0" onclick="switchView(0)" ondragover="handleBtnDragOver(event, 0)" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'week', 0)">WEEK 1</button>
-    <button class="week-btn" id="btn-w1" onclick="switchView(1)" ondragover="handleBtnDragOver(event, 1)" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'week', 1)">WEEK 2</button>
-    <button class="week-btn" id="btn-w2" onclick="switchView(2)" ondragover="handleBtnDragOver(event, 2)" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'week', 2)">WEEK 3</button>
-    <button class="week-btn" id="btn-w3" onclick="switchView(3)" ondragover="handleBtnDragOver(event, 3)" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'week', 3)">WEEK 4</button>
-    <button class="week-btn nav-orange" onclick="openModal('modal-add')">+ NEW JOB</button>
-    <button class="week-btn nav-orange" id="btn-toggle-pool" onclick="toggleUnassigned()" ondragover="handleBtnDragOver(event, 'pool')" ondragleave="handleBtnDragLeave(event)" ondrop="handleBtnDrop(event, 'pool')">UNASSIGNED</button>
-    <button class="week-btn nav-blue" onclick="switchView('invoice')">INVOICES</button>
-</div>
-
-<main id="main-container">
-    <section id="unassigned-sidebar">
-        <div class="sidebar-header">
-            <span>UNASSIGNED POOL</span>
-            <span style="cursor:pointer" onclick="toggleUnassigned()">×</span>
-        </div>
-        <div id="pool-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
-    </section>
-
-    <div id="content-area">
-        <section id="planner-board">
-            <table>
-                <thead><tr id="dynamic-date-headers"><th style="width:160px;">Driver</th></tr></thead>
-                <tbody id="planner-w0"></tbody>
-                <tbody id="planner-w1" style="display:none;"></tbody>
-                <tbody id="planner-w2" style="display:none;"></tbody>
-                <tbody id="planner-w3" style="display:none;"></tbody>
-            </table>
-        </section>
-        <section id="invoicing-view" style="display:none; padding:20px;">
-            <h2>Invoice Queue</h2>
-            <div id="invoice-list-body"></div>
-        </section>
-    </div>
-</main>
-
-<div id="modal-add" class="modal-overlay" onclick="closeModalOnOutsideClick(event, 'modal-add')">
-    <div class="modal-content">
-        <span class="modal-close" onclick="closeModal('modal-add')">&times;</span>
-        <h2 id="modal-title">New Job Entry</h2>
-        <input type="hidden" id="edit-id">
-        <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Date</label><input type="date" id="job-date"></div>
-            <div class="form-group" style="flex:1;"><label>Time</label><input type="text" id="coll-time"></div>
-        </div>
-        <div class="form-group"><label>Customer Name</label><input type="text" id="cust-name"></div>
-        <div class="form-group"><label>Pickup</label><input type="text" id="pickup"></div>
-        <div class="form-group"><label>Delivery</label><input type="text" id="delivery"></div>
-        <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Trailer</label><input type="text" id="trailer-num"></div>
-            <div class="form-group" style="flex:1;"><label>Price (£)</label><input type="text" id="job-price"></div>
-        </div>
-        <div class="form-group">
-            <label>Vehicle Type</label>
-            <select id="vehicle-type">
-                <option value="Artic">Artic</option><option value="Rigid">Rigid</option>
-                <option value="7.5t">7.5t</option><option value="Van">Van</option>
-            </select>
-        </div>
-        <div class="form-group"><label>Notes</label><textarea id="job-notes" style="height:40px;"></textarea></div>
-        <button id="add-job" onclick="saveJob()">Save Job</button>
-    </div>
-</div>
-
-<script>
-    const _URL = "https://tdrzytgiqvdulityqttr.supabase.co";
-    const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkcnp5dGdpcXZkdWxpdHlxdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTM5NTMsImV4cCI6MjA4ODcyOTk1M30.XN46i7u6STD-2afmN7-Jh1MltADGpEuWlLt_n7wknbA";
-    const sb = supabase.createClient(_URL, _KEY);
-
-    const fleet = [
-        { name: "Andy West", phone: "447734369810" }, { name: "Callum Lee", phone: "447359390140" },
-        { name: "Josh Harrison", phone: "447701238574" }, { name: "Lee Woodcock", phone: "447701238577" },
-        { name: "Marc Wickham", phone: "447701238576" }, { name: "Neil Woods", phone: "447701238567" },
-        { name: "Rhys Hill", phone: "447701238572" }, { name: "Richard Spence", phone: "447701238570" },
-        { name: "Roy Taylor", phone: "447701238558" }, { name: "Stuart Sleigh", phone: "447701238575" }
-    ];
-
-    let currentWeekOffset = 0;
-    let allJobsRaw = [];
-    let hoverTimer = null;
-
-    ['planner-w0', 'planner-w1', 'planner-w2', 'planner-w3'].forEach((boardId) => {
-        const board = document.getElementById(boardId);
-        fleet.forEach((driver, i) => {
-            let row = document.createElement('tr');
-            row.innerHTML = `<td class="driver-cell"><span>${driver.name}</span><span class="driver-weekly-total" id="${boardId}-total-${i}">Week: £0</span></td>` + 
-                            Array(5).fill(0).map((_,j) => `<td id="${boardId}-dr${i}-s${j}" ondrop="drop(event)" ondragover="allowDrop(event)"></td>`).join('');
-            board.appendChild(row);
-        });
-    });
-
-    // --- HOVER LOGIC ---
-    function handleBtnDragOver(e, type) {
-        e.preventDefault();
-        e.currentTarget.classList.add('drag-over');
-        
-        if (!hoverTimer) {
-            hoverTimer = setTimeout(() => {
-                if (type === 'pool') {
-                    if (!document.getElementById('unassigned-sidebar').classList.contains('open')) {
-                        toggleUnassigned();
-                    }
-                } else if (typeof type === 'number') {
-                    switchView(type);
-                }
-                hoverTimer = null;
-            }, 600);
-        }
-    }
-
-    function handleBtnDragLeave(e) {
-        e.currentTarget.classList.remove('drag-over');
-        clearTimeout(hoverTimer);
-        hoverTimer = null;
-    }
-
-    async function handleBtnDrop(e, type, val) {
-        e.preventDefault();
-        e.currentTarget.classList.remove('drag-over');
-        const id = e.dataTransfer.getData("text");
-        
-        if (type === 'pool') {
-            await sb.from('quotes').update({ status: 'pending', assigned_slot: null }).eq('id', id);
-        }
-        // If dropped on a week button, we usually wait for them to drop it in a specific cell, 
-        // but the view switch already happened via hover.
-        loadAll();
-    }
-    // -------------------
-
-    function toggleUnassigned() {
-        document.getElementById('unassigned-sidebar').classList.toggle('open');
-        document.getElementById('btn-toggle-pool').classList.toggle('active');
-    }
-
-    function openModal(id) { 
-        document.getElementById('modal-title').innerText = "New Job Entry";
-        document.getElementById('edit-id').value = "";
-        document.getElementById(id).style.display = 'flex'; 
-    }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function closeModalOnOutsideClick(e, id) { if(e.target.id === id) closeModal(id); }
-
-    function updateDateHeaders(offset) {
-        const headerRow = document.getElementById('dynamic-date-headers');
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-        let curr = new Date();
-        let first = curr.getDate() - curr.getDay() + 1 + (offset * 7);
-        let html = `<th style="width:160px;">Driver</th>`;
-        days.forEach((day, i) => {
-            let d = new Date(new Date().setDate(first + i));
-            let dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' });
-            html += `<th>${day} ${dateStr} <span id="total-${i}" style="color:var(--whatsapp-green); font-size:0.7rem;">£0</span></th>`;
-        });
-        headerRow.innerHTML = html;
-    }
-
-    function switchView(view) {
-        document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('active'));
-        if (view === 'invoice') {
-            document.getElementById('planner-board').style.display = 'none';
-            document.getElementById('invoicing-view').style.display = 'block';
-        } else {
-            currentWeekOffset = view;
-            document.getElementById('planner-board').style.display = 'block';
-            document.getElementById('invoicing-view').style.display = 'none';
-            document.getElementById(`btn-w${view}`).classList.add('active');
-            [0,1,2,3].forEach(i => document.getElementById(`planner-w${i}`).style.display = (i === view ? 'table-row-group' : 'none'));
-            updateDateHeaders(view);
-            updateCalculations();
-        }
-    }
-
-    async function loadAll() {
-        document.querySelectorAll('.job-card').forEach(c => c.remove());
-        const { data: jobs } = await sb.from('quotes').select('*');
-        if (jobs) {
-            allJobsRaw = jobs;
-            jobs.forEach(q => {
-                if (q.status === 'billed' || q.status === 'completed') return; 
-                const card = createCardElement(q);
-                if (q.assigned_slot) {
-                    const slot = document.getElementById(q.assigned_slot);
-                    if (slot) slot.appendChild(card);
-                } else {
-                    document.getElementById('pool-container').appendChild(card);
-                }
-            });
-        }
-        updateCalculations();
-    }
-
-    function createCardElement(q) {
-        const card = document.createElement('div');
-        card.className = "job-card"; card.id = q.id; card.draggable = true;
-        card.ondragstart = (e) => { e.dataTransfer.setData("text", e.target.id); e.dataTransfer.dropEffect = "move"; };
-        card.onclick = function(e) { if(!e.target.classList.contains('action-btn')) this.classList.toggle('expanded'); };
-        
-        card.innerHTML = `
-            <div class="card-row-1">
-                <div class="card-actions">
-                    <span class="action-btn" title="WhatsApp" onclick="sendWhatsApp(event, '${q.id}')">✆</span>
-                    <span class="action-btn" title="Edit" onclick="editJob(event, '${q.id}')">✎</span>
-                    <span class="action-btn" title="Duplicate" onclick="duplicateJob(event, '${q.id}')">❐</span>
-                    <span class="action-btn" title="POD" onclick="openPOD(event, '${q.id}')">📎</span>
-                    <span class="action-btn" title="Complete" onclick="markPODReceived(event, '${q.id}')">✅</span>
-                </div>
-                <span class="action-btn" onclick="deleteJob('${q.id}')">×</span>
-            </div>
-            <div style="font-weight:bold; margin:2px 0;">${q.customer_name}</div>
-            <div style="display:flex; gap:5px; margin-bottom:4px;">
-                <span class="vehicle-tag">${q.vehicle_type}</span>
-                <span class="price-tag">£<span class="data-price">${q.total_price}</span></span>
-            </div>
-            <div class="card-body">
-                <div style="margin-top:2px;">${q.pickup} ➔ ${q.delivery}</div>
-            </div>`;
-        return card;
-    }
-
-    async function saveJob() {
-        const id = document.getElementById('edit-id').value;
-        const payload = {
-            customer_name: document.getElementById('cust-name').value,
-            date: document.getElementById('job-date').value,
-            time: document.getElementById('coll-time').value,
-            pickup: document.getElementById('pickup').value,
-            delivery: document.getElementById('delivery').value,
-            trailer_num: document.getElementById('trailer-num').value,
-            total_price: document.getElementById('job-price').value || "0",
-            vehicle_type: document.getElementById('vehicle-type').value,
-            notes: document.getElementById('job-notes').value
-        };
-        if(id) await sb.from('quotes').update(payload).eq('id', id);
-        else { payload.status = 'pending'; await sb.from('quotes').insert([payload]); }
-        loadAll(); closeModal('modal-add');
-    }
-
-    function editJob(e, id) {
-        e.stopPropagation();
-        const j = allJobsRaw.find(x => x.id == id);
-        document.getElementById('edit-id').value = id;
-        document.getElementById('cust-name').value = j.customer_name;
-        document.getElementById('job-date').value = j.date;
-        document.getElementById('coll-time').value = j.time;
-        document.getElementById('pickup').value = j.pickup;
-        document.getElementById('delivery').value = j.delivery;
-        document.getElementById('trailer-num').value = j.trailer_num;
-        document.getElementById('job-price').value = j.total_price;
-        document.getElementById('vehicle-type').value = j.vehicle_type;
-        document.getElementById('job-notes').value = j.notes;
-        document.getElementById('modal-title').innerText = "Edit Job";
-        document.getElementById('modal-add').style.display = 'flex';
-    }
-
-    async function drop(ev) {
-        ev.preventDefault();
-        const id = ev.dataTransfer.getData("text");
-        const target = ev.currentTarget;
-        const isBoard = target.tagName === 'TD';
-        
-        // Local Optimistic Update
-        const card = document.getElementById(id);
-        if(card) target.appendChild(card);
-
-        await sb.from('quotes').update({ 
-            status: isBoard ? 'assigned' : 'pending', 
-            assigned_slot: isBoard ? target.id : null 
-        }).eq('id', id);
-        loadAll();
-    }
-
-    function allowDrop(ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = "move"; }
-
-    function updateCalculations() {
-        let grand = 0; let dayTots = [0,0,0,0,0];
-        const currentBoardId = `planner-w${currentWeekOffset}`;
-        fleet.forEach((_, i) => {
-            let driverSum = 0;
-            document.querySelectorAll(`[id^="${currentBoardId}-dr${i}-s"]`).forEach(slot => {
-                slot.querySelectorAll('.data-price').forEach(p => driverSum += parseFloat(p.innerText) || 0);
-            });
-            const el = document.getElementById(`${currentBoardId}-total-${i}`);
-            if(el) el.innerText = `Week: £${driverSum.toFixed(2)}`;
-        });
-        document.querySelectorAll(`#${currentBoardId} td[id*="-s"]`).forEach(slot => {
-            const dayIdx = parseInt(slot.id.split('-s')[1]);
-            slot.querySelectorAll('.data-price').forEach(p => {
-                const val = parseFloat(p.innerText) || 0;
-                grand += val; dayTots[dayIdx] += val;
-            });
-        });
-        document.getElementById('grand-total').innerText = "£" + grand.toFixed(2);
-        dayTots.forEach((v,i) => { if(document.getElementById('total-'+i)) document.getElementById('total-'+i).innerText = "£"+v.toFixed(2); });
-    }
-
-    function openPOD(e, id) { e.stopPropagation(); window.open(`https://drive.google.com/drive/search?q=${id}`, '_blank'); }
-    async function markPODReceived(e, id) { e.stopPropagation(); if(confirm(`Move to Invoice Queue?`)) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); } }
-    async function deleteJob(id) { if(confirm("Delete?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); } }
-    async function duplicateJob(e, id) {
-        e.stopPropagation();
-        const j = allJobsRaw.find(x => x.id == id);
-        const { id: _, created_at: __, assigned_slot: ___, ...newJob } = j;
-        newJob.status = 'pending';
-        await sb.from('quotes').insert([newJob]);
-        loadAll();
-    }
-    function sendWhatsApp(e, id) {
-        e.stopPropagation();
-        const j = allJobsRaw.find(x => x.id == id);
-        const dr = document.getElementById(id).closest('tr')?.querySelector('.driver-cell span')?.innerText;
-        const driver = fleet.find(d => d.name === dr);
-        if(!driver) return alert("Assign a driver first!");
-        const podLink = `https://script.google.com/macros/s/AKfycbzfVb0yx0XMJytLgyWJgqFPBi0U2brnecZXYGYW299YfG6EmNK-AFJcj5DahTWQl881/exec?jobid=${id}`;
-        const msg = encodeURIComponent(`*FROST TRANSPORT*\nCust: ${j.customer_name}\nRoute: ${j.pickup} to ${j.delivery}\n\nPOD LINK: ${podLink}`);
-        window.open(`https://wa.me/${driver.phone}?text=${msg}`, '_blank');
-    }
 
     window.onload = () => { switchView(0); loadAll(); };
     sb.channel('any').on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => loadAll()).subscribe();
