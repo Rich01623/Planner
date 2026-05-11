@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - V5.2 (Day Mode Optimized)</title>
+    <title>FROST Transport Planner - V5.6 (Live Postcode Database)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -31,22 +31,33 @@
 
         .week-selector { background: #333; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 90; }
         .menu-group { display: flex; gap: 8px; align-items: center; }
-        .week-btn { padding: 8px 18px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 0.8rem; }
+        .week-btn { padding: 8px 18px; border: none; background: #555; color: white; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 0.8rem; transition: background 0.2s; }
+        .week-btn:hover { background: #666; }
         .week-btn.active { background: var(--frost-red); }
         .nav-blue { background: var(--frost-blue); }
+        .nav-blue:hover { background: #004494; }
 
         main { display: flex; flex-grow: 1; overflow: hidden; position: relative; }
-        #unassigned-sidebar { width: var(--sidebar-width); background: #eee; border-right: 2px solid var(--border-color); transition: margin-left 0.3s ease; margin-left: calc(-1 * var(--sidebar-width)); flex-shrink: 0; z-index: 80; }
+        
+        /* UNASSIGNED SIDEBAR (LEFT) */
+        #unassigned-sidebar { width: var(--sidebar-width); background: #eee; border-right: 2px solid var(--border-color); transition: margin-left 0.3s ease; margin-left: calc(-1 * var(--sidebar-width)); flex-shrink: 0; z-index: 80; display: flex; flex-direction: column; }
         #unassigned-sidebar.open { margin-left: 0; }
-        #pool-container { flex-grow: 1; overflow-y: auto; padding: 10px; margin: 10px; border: 2px dashed #aaa; border-radius: 6px; min-height: 100px; background: white; }
+        #pool-container { flex-grow: 1; overflow-y: auto; padding: 10px; margin: 10px; border: 2px dashed #aaa; border-radius: 6px; background: white; }
+
+        /* YARD SIDEBAR (RIGHT) */
+        #yard-sidebar { width: var(--sidebar-width); background: #eee; border-left: 2px solid var(--border-color); transition: right 0.3s ease; right: calc(-1 * var(--sidebar-width)); flex-shrink: 0; z-index: 85; position: absolute; height: 100%; display: flex; flex-direction: column; }
+        #yard-sidebar.open { right: 0; box-shadow: -2px 0 10px rgba(0,0,0,0.1); }
+        #yard-container { flex-grow: 1; overflow-y: auto; padding: 10px; margin: 10px; border: 2px dashed #aaa; border-radius: 6px; background: white; }
 
         #content-area { flex-grow: 1; overflow: hidden; padding: 10px; }
-        #planner-board, #invoicing-view, #history-view { background: white; border-radius: 8px; height: 100%; overflow: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #planner-board, #invoicing-view, #history-view, #subbed-view, #cancelled-view { background: white; border-radius: 8px; height: 100%; overflow: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         
         table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
         th { background: var(--frost-black); color: white; border: 1px solid var(--border-color); padding: 12px 8px; position: sticky; top: 0; z-index: 5; text-align: left; }
         
-        .weekend-col { display: none; background: #f9f9f9 !important; }
+        /* FIXED WEEKEND HEADERS */
+        .weekend-col { display: none; }
+        td.weekend-col { background: #f9f9f9; }
         .show-weekend .weekend-col { display: table-cell; }
 
         .vehicle-cell { background: #eee; color: #000; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); border-bottom: 1px solid var(--border-color); position: sticky; left: 0; z-index: 2; vertical-align: middle; }
@@ -59,7 +70,7 @@
         .job-card { background: white; color: black; border: 1px solid var(--border-color); border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: grab; font-size: 0.72rem; position: relative; transition: all 0.2s; }
         .job-card.completed-grey { background: #f0f0f0 !important; border-left-color: #bbb !important; color: #888 !important; opacity: 0.8; }
         
-        /* === 6-STAGE DISPATCH COLORS (DAY MODE OPTIMIZED) === */
+        /* === 6-STAGE DISPATCH COLORS === */
         .job-card.status-sent { border-left-color: #f39c12; } 
         .job-card.status-ack { background: #e3f2fd; border-left-color: #0056b3; } 
         .job-card.status-arr { background: #e8f5e9; border-left-color: #2e7d32; } 
@@ -109,7 +120,6 @@
     <div style="display:flex; gap:15px; align-items:center;">
         <div id="week-display-box" class="week-info-box">WK -- | MON --/--/--</div>
         <button class="week-btn" onclick="loadAll()">SYNC</button>
-        <!-- NIGHT MODE TOGGLE BUTTON REMOVED -->
         <div class="grand-total-box"><span class="grand-total-value" id="grand-total">£0.00</span></div>
     </div>
 </header>
@@ -118,9 +128,12 @@
     <div class="menu-group">
         <button class="week-btn nav-blue" onclick="toggleUnassigned()">UNASSIGNED</button>
         <button class="week-btn nav-blue" onclick="resetForm(); openModal('modal-add')">+ NEW JOB</button>
+        <button class="week-btn nav-blue" id="btn-yard" onclick="toggleYard()" ondrop="drop(event)" ondragover="allowDrop(event)">YARD</button>
         <button class="week-btn" style="background:#888;" onclick="toggleWeekend()">WEEKEND BOOKINGS</button>
-        <button class="week-btn" style="background:#555;" onclick="alert('Subbed view coming soon')">SUBBED TO CONTRACTOR</button>
-        <button class="week-btn" style="background:#555;" onclick="alert('Cancelled view coming soon')">CANCELLED JOBS</button>
+        <button class="week-btn nav-blue" id="btn-subbed" onclick="switchView('subbed')">SUBBED TO CONTRACTOR</button>
+        <button class="week-btn nav-blue" id="btn-cancelled" onclick="switchView('cancelled')">CANCELLED JOBS</button>
+        <!-- NEW POSTCODE LOOKUP BUTTON -->
+        <button class="week-btn nav-blue" onclick="openPostcodeSearch()" style="background:#2c3e50;">📍 POSTCODE</button>
     </div>
     <div class="menu-group">
         <button class="week-btn active" id="btn-w0" onclick="switchView(0)">WEEK 1</button>
@@ -130,14 +143,21 @@
     </div>
     <div class="menu-group">
         <button class="week-btn nav-blue" id="btn-hist" onclick="switchView('history')">HISTORY</button>
-        <button class="week-btn nav-blue" onclick="switchView('invoice')">INVOICES</button>
+        <button class="week-btn nav-blue" id="btn-invoice" onclick="switchView('invoice')">INVOICES</button>
     </div>
 </div>
 
 <main>
+    <!-- LEFT SIDEBAR: UNASSIGNED -->
     <section id="unassigned-sidebar">
         <div style="padding:10px; background:#e0e0e0; color:black; font-weight:bold; display:flex; justify-content:space-between; border-bottom: 1px solid #ccc;">POOL <span onclick="toggleUnassigned()" style="cursor:pointer; color: var(--frost-red);">✕</span></div>
         <div id="pool-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
+    </section>
+
+    <!-- RIGHT SIDEBAR: YARD HUB -->
+    <section id="yard-sidebar">
+        <div style="padding:10px; background:#e0e0e0; color:black; font-weight:bold; display:flex; justify-content:space-between; border-bottom: 1px solid #ccc;">YARD (AWAITING DELIVERY) <span onclick="toggleYard()" style="cursor:pointer; color: var(--frost-red);">✕</span></div>
+        <div id="yard-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
     </section>
 
     <div id="content-area">
@@ -175,9 +195,32 @@
                 <tbody id="history-list-body"></tbody>
             </table>
         </section>
+
+        <!-- SUBBED VIEW -->
+        <section id="subbed-view" style="display:none; padding:20px;">
+            <h2>Subbed to Contractor</h2>
+            <table style="width:100%; border-collapse: collapse;">
+                <thead style="background:#000; color:white;">
+                    <tr><th style="width:100px;">Date</th><th>Customer</th><th>Route</th><th>Vehicle</th><th>Price</th><th style="width:120px;">Action</th></tr>
+                </thead>
+                <tbody id="subbed-list-body"></tbody>
+            </table>
+        </section>
+
+        <!-- CANCELLED VIEW -->
+        <section id="cancelled-view" style="display:none; padding:20px;">
+            <h2>Cancelled Jobs</h2>
+            <table style="width:100%; border-collapse: collapse;">
+                <thead style="background:#000; color:white;">
+                    <tr><th style="width:100px;">Date</th><th>Customer</th><th>Route</th><th>Vehicle</th><th>Price</th><th style="width:120px;">Action</th></tr>
+                </thead>
+                <tbody id="cancelled-list-body"></tbody>
+            </table>
+        </section>
     </div>
 </main>
 
+<!-- ADD JOB MODAL -->
 <div id="modal-add" class="modal-overlay" onclick="closeModalOnOutsideClick(event, 'modal-add')">
     <div class="modal-content">
         <h2 style="margin-top:0;">Job Details</h2>
@@ -227,6 +270,21 @@
         </div>
         <button id="add-job-btn" onclick="saveJob()">Save Changes</button>
         <button class="week-btn" onclick="closeModal('modal-add')" style="width:100%; margin-top:8px; background:#ddd; color:#333;">Close</button>
+    </div>
+</div>
+
+<!-- NEW POSTCODE SEARCH MODAL -->
+<div id="modal-postcode" class="modal-overlay" onclick="closeModalOnOutsideClick(event, 'modal-postcode')">
+    <div class="modal-content" style="width: 320px; text-align: center;">
+        <h3 style="margin-top:0; color:var(--frost-red);">Postcode Lookup</h3>
+        <p style="font-size: 0.8rem; color: #666; margin-bottom:15px;">Type full or partial postcode (e.g., NG18 or KT1)</p>
+        <input type="text" id="pc-search-input" placeholder="Enter Postcode..." style="text-transform: uppercase; text-align: center; font-size: 1.2rem; margin-bottom: 15px;" onkeyup="lookupPostcode()">
+        
+        <div id="pc-search-result" style="font-size: 1rem; font-weight: bold; min-height: 80px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f9f9f9; border:1px solid #eee; border-radius:6px; padding:10px;">
+            <span style="color:#aaa; font-weight:normal; font-size:0.9rem;">Waiting for input...</span>
+        </div>
+        
+        <button class="week-btn" onclick="closeModal('modal-postcode')" style="width:100%; margin-top:15px; background:#ddd; color:#333;">Close</button>
     </div>
 </div>
 
@@ -286,7 +344,7 @@
         if (!jobs) return;
         allJobsRaw = jobs;
         jobs.forEach(q => {
-            if (q.status === 'driver_config' || q.status === 'archived' || q.status === 'billed') return;
+            if (['driver_config', 'archived', 'billed', 'subbed', 'cancelled'].includes(q.status)) return;
             const card = createCardElement(q);
             const slot = q.assigned_slot ? document.getElementById(q.assigned_slot) : document.getElementById('pool-container');
             if (slot) slot.appendChild(card);
@@ -294,6 +352,8 @@
         
         renderInvoiceList();
         renderHistoryList();
+        renderSubbedList();
+        renderCancelledList();
         updateCalculations();
         restoreDrivers(jobs);
     }
@@ -366,6 +426,12 @@
                 <div class="detail-row"><b>Company:</b> <span>${q.del_cust_name || '-'}</span></div>
                 <div class="detail-row"><b>Town:</b> <span>${q.del_town || '-'}</span></div>
                 <div class="detail-row"><b>Time:</b> <span>${dtFormat(q.del_datetime)}</span></div>
+
+                <!-- SUBBED & CANCEL BUTTONS (Inside Expanded View) -->
+                <div style="display:flex; gap:5px; margin-top:10px; padding-top:8px; border-top: 1px solid #eee;">
+                    <button class="action-btn" style="flex:1; padding:6px; font-size:0.7rem; background:#34495e; color:white; border:none; border-radius:3px; font-weight:bold;" onclick="markSubbed(event, '${q.id}')">SUBBED</button>
+                    <button class="action-btn" style="flex:1; padding:6px; font-size:0.7rem; background:#c1272d; color:white; border:none; border-radius:3px; font-weight:bold;" onclick="markCancelled(event, '${q.id}')">CANCEL</button>
+                </div>
             </div>`;
         return card;
     }
@@ -429,10 +495,28 @@
         openModal('modal-add');
     }
 
+    async function markSubbed(e, id) {
+        e.stopPropagation();
+        if(confirm("Move this job to Subbed to Contractor?")) {
+            await sb.from('quotes').update({ status: 'subbed', assigned_slot: null, dispatch_status: 'unsent' }).eq('id', id);
+            loadAll();
+        }
+    }
+
+    async function markCancelled(e, id) {
+        e.stopPropagation();
+        if(confirm("Cancel this job?")) {
+            await sb.from('quotes').update({ status: 'cancelled', assigned_slot: null, dispatch_status: 'unsent' }).eq('id', id);
+            loadAll();
+        }
+    }
+
     async function dispatchJob(e, id) {
         e.stopPropagation();
         const j = allJobsRaw.find(x => x.id == id);
-        if (!j || !j.assigned_slot || j.assigned_slot.includes('pool')) return alert("Please assign the job to a driver's row first.");
+        if (!j || !j.assigned_slot || j.assigned_slot.includes('pool') || j.assigned_slot.includes('yard')) {
+            return alert("Please assign the job to a driver's row first before dispatching.");
+        }
 
         const cellId = j.assigned_slot.split('-s')[0]; 
         const dropdown = document.getElementById(`sel-${cellId}`);
@@ -472,22 +556,108 @@
         const body = document.getElementById('history-list-body');
         if (!body) return; body.innerHTML = "";
         allJobsRaw.filter(j => j.status === 'billed' || j.status === 'archived').sort((a,b) => new Date(b.coll_datetime) - new Date(a.coll_datetime)).forEach(j => {
-            body.innerHTML += `<tr class="history-row" onclick="editJob(event, '${j.id}')"><td>${formatUKDate(j.coll_datetime)}</td><td>${j.customer_name}</td><td>${j.coll_town} ➔ ${j.del_town}</td><td>-</td><td>${j.vehicle_type}</td><td>£${j.total_price}</td><td><button class="pdf-btn" onclick="generatePDF(event, '${j.id}')">📄 PDF</button></td></tr>`;
+            body.innerHTML += `<tr style="cursor:pointer; border-bottom:1px solid #ccc;" onclick="editJob(event, '${j.id}')"><td>${formatUKDate(j.coll_datetime)}</td><td>${j.customer_name}</td><td>${j.coll_town} ➔ ${j.del_town}</td><td>-</td><td>${j.vehicle_type}</td><td>£${j.total_price}</td><td><button class="pdf-btn" onclick="generatePDF(event, '${j.id}')">📄 PDF</button></td></tr>`;
         });
     }
 
+    function renderSubbedList() {
+        const body = document.getElementById('subbed-list-body');
+        if (!body) return; body.innerHTML = "";
+        allJobsRaw.filter(j => j.status === 'subbed').sort((a,b) => new Date(b.coll_datetime) - new Date(a.coll_datetime)).forEach(j => {
+            body.innerHTML += `<tr style="cursor:pointer; border-bottom:1px solid #ccc;" onclick="editJob(event, '${j.id}')"><td>${formatUKDate(j.coll_datetime)}</td><td>${j.customer_name}</td><td>${j.coll_town} ➔ ${j.del_town}</td><td>${j.vehicle_type}</td><td>£${j.total_price}</td><td><button class="pdf-btn" onclick="generatePDF(event, '${j.id}')">📄 PDF</button></td></tr>`;
+        });
+    }
+
+    function renderCancelledList() {
+        const body = document.getElementById('cancelled-list-body');
+        if (!body) return; body.innerHTML = "";
+        allJobsRaw.filter(j => j.status === 'cancelled').sort((a,b) => new Date(b.coll_datetime) - new Date(a.coll_datetime)).forEach(j => {
+            body.innerHTML += `<tr style="cursor:pointer; border-bottom:1px solid #ccc;" onclick="editJob(event, '${j.id}')"><td>${formatUKDate(j.coll_datetime)}</td><td>${j.customer_name}</td><td>${j.coll_town} ➔ ${j.del_town}</td><td>${j.vehicle_type}</td><td>£${j.total_price}</td><td><button class="pdf-btn" onclick="generatePDF(event, '${j.id}')">📄 PDF</button></td></tr>`;
+        });
+    }
+
+    // === PROFESSIONAL MULTI-TABLE PDF GENERATOR ===
     function generatePDF(event, id) {
         event.stopPropagation();
         const j = allJobsRaw.find(x => x.id == id);
-        const { jsPDF } = window.jspdf; const doc = new jsPDF();
-        doc.text(`FROST TRANSPORT - JOB SUMMARY`, 10, 10);
-        doc.autoTable({ startY: 20, body: [['Customer', j.customer_name], ['Route', `${j.coll_town} to ${j.del_town}`], ['Price', `£${j.total_price}`]] });
-        doc.save(`Job_${j.id.slice(0,5)}.pdf`);
+        const { jsPDF } = window.jspdf; 
+        const doc = new jsPDF();
+        
+        doc.setFontSize(18);
+        doc.setTextColor(193, 39, 45); // Frost Red
+        doc.text(`FROST TRANSPORT - JOB MANIFEST`, 14, 20);
+        
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Job Reference: ${j.id.slice(0,8).toUpperCase()}`, 14, 28);
+        doc.text(`Date Created: ${new Date(j.created_at).toLocaleDateString('en-GB')}`, 14, 34);
+
+        // General Info Table
+        doc.autoTable({ 
+            startY: 40,
+            theme: 'grid',
+            headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+            bodyStyles: { textColor: [0, 0, 0] },
+            head: [['Field', 'Details']],
+            body: [
+                ['Customer Name', j.customer_name || 'N/A'],
+                ['Customer Phone', j.customer_phone || 'N/A'],
+                ['Customer Email', j.customer_email || 'N/A'],
+                ['Vehicle Required', j.vehicle_type || 'N/A'],
+                ['Total Price', `£${j.total_price || '0.00'}`]
+            ] 
+        });
+
+        // Collection Table
+        doc.autoTable({ 
+            startY: doc.lastAutoTable.finalY + 10,
+            theme: 'grid',
+            headStyles: { fillColor: [193, 39, 45], textColor: [255, 255, 255] },
+            head: [['COLLECTION DETAILS', '']],
+            body: [
+                ['Collection Ref', j.coll_ref || 'N/A'],
+                ['Address', `${j.coll_street || ''}, ${j.coll_town || ''}, ${j.coll_county || ''}`.replace(/^, |, $/g, '').trim() || 'N/A'],
+                ['Postcode', j.coll_postcode || 'N/A'],
+                ['Date & Time', j.coll_datetime ? j.coll_datetime.replace('T', ' ') : 'N/A']
+            ] 
+        });
+
+        // Delivery Table
+        doc.autoTable({ 
+            startY: doc.lastAutoTable.finalY + 10,
+            theme: 'grid',
+            headStyles: { fillColor: [46, 125, 50], textColor: [255, 255, 255] },
+            head: [['DELIVERY DETAILS (1)', '']],
+            body: [
+                ['Delivery Company', j.del_cust_name || 'N/A'],
+                ['Delivery Ref', j.del_ref || 'N/A'],
+                ['Address', `${j.del_street || ''}, ${j.del_town || ''}, ${j.del_county || ''}`.replace(/^, |, $/g, '').trim() || 'N/A'],
+                ['Postcode', j.del_postcode || 'N/A'],
+                ['Date & Time', j.del_datetime ? j.del_datetime.replace('T', ' ') : 'N/A']
+            ] 
+        });
+
+        // Multidrop Table
+        if (j.del_postcode_2) {
+            doc.autoTable({ 
+                startY: doc.lastAutoTable.finalY + 10,
+                theme: 'grid',
+                headStyles: { fillColor: [214, 137, 16], textColor: [255, 255, 255] },
+                head: [['DELIVERY DETAILS (2 - Multidrop)', '']],
+                body: [
+                    ['Postcode', j.del_postcode_2 || 'N/A']
+                ] 
+            });
+        }
+
+        doc.save(`FROST_Job_${j.id.slice(0,5)}.pdf`);
     }
 
     function filterHistory() {
         const q = document.getElementById('history-search').value.toLowerCase();
-        document.querySelectorAll('#history-list-body tr').forEach(r => { r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none"; });
+        document.querySelectorAll('#history-list-body tr, #subbed-list-body tr, #cancelled-list-body tr').forEach(r => { 
+            r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none"; 
+        });
     }
 
     async function drop(ev) {
@@ -495,10 +665,16 @@
         const id = ev.dataTransfer.getData("text");
         const target = ev.currentTarget;
         let finalTarget = target.classList.contains('job-card') ? target.parentElement : target;
+
+        if (finalTarget.id === 'btn-yard') {
+            finalTarget = document.getElementById('yard-container');
+        }
+
         const isPool = finalTarget.id === 'pool-container';
+        const isYard = finalTarget.id === 'yard-container';
 
         let assignedDriver = null;
-        if (!isPool) {
+        if (!isPool && !isYard) {
             const cellId = finalTarget.id.split('-s')[0]; 
             const dropdown = document.getElementById(`sel-${cellId}`);
             if (dropdown && dropdown.value) {
@@ -508,12 +684,12 @@
         }
 
         let updatePayload = { 
-            status: isPool ? 'pending' : 'assigned', 
+            status: isPool ? 'pending' : (isYard ? 'yard' : 'assigned'), 
             assigned_slot: isPool ? null : finalTarget.id,
             assigned_driver: assignedDriver 
         };
 
-        if (isPool) updatePayload.dispatch_status = 'unsent'; 
+        if (isPool || isYard) updatePayload.dispatch_status = 'unsent'; 
 
         await sb.from('quotes').update(updatePayload).eq('id', id);
         loadAll();
@@ -535,8 +711,13 @@
         document.getElementById('planner-board').style.display = 'none';
         document.getElementById('invoicing-view').style.display = 'none';
         document.getElementById('history-view').style.display = 'none';
-        if (view === 'invoice') document.getElementById('invoicing-view').style.display = 'block';
+        document.getElementById('subbed-view').style.display = 'none';
+        document.getElementById('cancelled-view').style.display = 'none';
+
+        if (view === 'invoice') { document.getElementById('invoicing-view').style.display = 'block'; document.getElementById('btn-invoice').classList.add('active'); }
         else if (view === 'history') { document.getElementById('history-view').style.display = 'block'; document.getElementById('btn-hist').classList.add('active'); }
+        else if (view === 'subbed') { document.getElementById('subbed-view').style.display = 'block'; document.getElementById('btn-subbed').classList.add('active'); }
+        else if (view === 'cancelled') { document.getElementById('cancelled-view').style.display = 'block'; document.getElementById('btn-cancelled').classList.add('active'); }
         else {
             currentWeekOffset = view; document.getElementById('planner-board').style.display = 'block';
             document.getElementById(`btn-w${view}`).classList.add('active');
@@ -547,9 +728,11 @@
     }
 
     function getWeekInfo(offset) {
-        let now = new Date(); let mon = new Date(now.setDate(now.getDate() - now.getDay() + 1 + (offset * 7)));
+        let now = new Date(); 
+        let dayNum = now.getDay() || 7; 
+        let mon = new Date(now.setDate(now.getDate() - dayNum + 1 + (offset * 7)));
         let d = new Date(Date.UTC(mon.getFullYear(), mon.getMonth(), mon.getDate()));
-        let dayNum = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        let dNum = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - dNum);
         let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
         let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
         return { week: weekNo, date: mon.toLocaleDateString('en-GB') };
@@ -557,11 +740,15 @@
 
     function updateDateHeaders(offset) {
         const headerRow = document.getElementById('dynamic-date-headers');
-        let now = new Date(); let first = now.getDate() - now.getDay() + 1 + (offset * 7);
+        let now = new Date(); 
+        let dayNum = now.getDay() || 7; 
+        let first = now.getDate() - dayNum + 1 + (offset * 7);
+        
         let html = `<th style="width:160px; position: sticky; left: 0; top: 0; z-index: 10; border-right: 3px solid var(--frost-red);">Vehicle / Driver</th>`;
-        ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((day, i) => {
-            let d = new Date(new Date().setDate(first + i));
-            html += `<th class="${i >= 5 ? 'weekend-col' : ''}">${day} ${d.toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit'})}</th>`;
+        ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((dayName, i) => {
+            let d = new Date(now.getTime());
+            d.setDate(first + i);
+            html += `<th class="${i >= 5 ? 'weekend-col' : ''}">${dayName} ${d.toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit'})}</th>`;
         });
         headerRow.innerHTML = html;
     }
@@ -576,6 +763,8 @@
     function formatUKDate(iso) { if(!iso) return '-'; return new Date(iso).toLocaleDateString('en-GB'); }
     function toggleWeekend() { document.body.classList.toggle('show-weekend'); }
     function toggleUnassigned() { document.getElementById('unassigned-sidebar').classList.toggle('open'); }
+    function toggleYard() { document.getElementById('yard-sidebar').classList.toggle('open'); }
+    
     function allowDrop(ev) { ev.preventDefault(); }
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -588,6 +777,106 @@
                 if (el) el.value = q.driver_phone || q.customer_phone || "";
             }
         });
+    }
+
+    // === LIVE POSTCODE DICTIONARY & API SEARCH ===
+    const ukRegions = {
+        "AB": "Aberdeen", "AL": "St Albans", "B": "Birmingham", "BA": "Bath", "BD": "Bradford", 
+        "BH": "Bournemouth", "BL": "Bolton", "BN": "Brighton", "BR": "Bromley", "BS": "Bristol", 
+        "BT": "Belfast", "CA": "Carlisle", "CB": "Cambridge", "CF": "Cardiff", "CH": "Chester", 
+        "CM": "Chelmsford", "CO": "Colchester", "CR": "Croydon", "CT": "Canterbury", "CV": "Coventry", 
+        "CW": "Crewe", "DA": "Dartford", "DD": "Dundee", "DE": "Derby", "DG": "Dumfries", "DH": "Durham", 
+        "DL": "Darlington", "DN": "Doncaster", "DT": "Dorchester", "DY": "Dudley", "E": "East London", 
+        "EC": "East Central London", "EH": "Edinburgh", "EN": "Enfield", "EX": "Exeter", "FK": "Falkirk", 
+        "FY": "Blackpool", "G": "Glasgow", "GL": "Gloucester", "GU": "Guildford", "HA": "Harrow", 
+        "HD": "Huddersfield", "HG": "Harrogate", "HP": "Hemel Hempstead", "HR": "Hereford", 
+        "HS": "Outer Hebrides", "HU": "Hull", "HX": "Halifax", "IG": "Ilford", "IP": "Ipswich", 
+        "IV": "Inverness", "KA": "Kilmarnock", "KT": "Kingston upon Thames", "KW": "Kirkwall", 
+        "KY": "Kirkcaldy", "L": "Liverpool", "LA": "Lancaster", "LD": "Llandrindod Wells", 
+        "LE": "Leicester", "LL": "Llandudno", "LN": "Lincoln", "LS": "Leeds", "LU": "Luton", 
+        "M": "Manchester", "ME": "Medway", "MK": "Milton Keynes", "ML": "Motherwell", "N": "North London", 
+        "NE": "Newcastle", "NG": "Nottingham", "NN": "Northampton", "NP": "Newport", "NR": "Norwich", 
+        "NW": "North West London", "OL": "Oldham", "OX": "Oxford", "PA": "Paisley", "PE": "Peterborough", 
+        "PH": "Perth", "PL": "Plymouth", "PO": "Portsmouth", "PR": "Preston", "RG": "Reading", 
+        "RH": "Redhill", "RM": "Romford", "S": "Sheffield", "SA": "Swansea", "SE": "South East London", 
+        "SG": "Stevenage", "SK": "Stockport", "SL": "Slough", "SM": "Sutton", "SN": "Swindon", 
+        "SO": "Southampton", "SP": "Salisbury", "SR": "Sunderland", "SS": "Southend-on-Sea", 
+        "ST": "Stoke-on-Trent", "SW": "South West London", "SY": "Shrewsbury", "TA": "Taunton", 
+        "TD": "Galashiels", "TF": "Telford", "TN": "Tonbridge", "TQ": "Torquay", "TR": "Truro", 
+        "TS": "Cleveland", "TW": "Twickenham", "UB": "Southall", "W": "West London", "WA": "Warrington", 
+        "WC": "West Central London", "WD": "Watford", "WF": "Wakefield", "WN": "Wigan", "WR": "Worcester", 
+        "WS": "Walsall", "WV": "Wolverhampton", "YO": "York", "ZE": "Lerwick"
+    };
+
+    let pcDebounceTimer;
+    
+    function openPostcodeSearch() {
+        document.getElementById('pc-search-input').value = '';
+        document.getElementById('pc-search-result').innerHTML = '<span style="color:#aaa; font-weight:normal; font-size:0.9rem;">Waiting for input...</span>';
+        openModal('modal-postcode');
+        setTimeout(() => document.getElementById('pc-search-input').focus(), 100);
+    }
+
+    async function lookupPostcode() {
+        let input = document.getElementById('pc-search-input').value.toUpperCase().replace(/\s+/g, '');
+        let resultBox = document.getElementById('pc-search-result');
+        
+        clearTimeout(pcDebounceTimer);
+        
+        if (input.length === 0) {
+            resultBox.innerHTML = '<span style="color:#aaa; font-weight:normal; font-size:0.9rem;">Waiting for input...</span>';
+            return;
+        }
+
+        // 1. Instant Prefix Check (Offline)
+        let prefixMatch = input.match(/^[A-Z]{1,2}/);
+        let region = "Unknown Region";
+        if (prefixMatch && ukRegions[prefixMatch[0]]) {
+            region = ukRegions[prefixMatch[0]];
+        }
+
+        if (input.length <= 2) {
+            resultBox.innerHTML = `<span style="color:var(--frost-blue); font-size:1.1rem;">Area: ${region}</span><br><span style="font-size:0.75rem; color:#888; margin-top:5px; font-weight:normal;">Add numbers (e.g., ${input}1) for Town & County</span>`;
+            return;
+        }
+
+        resultBox.innerHTML = `<span style="color:#888; font-size:0.9rem;">Searching database...</span>`;
+
+        // 2. Fetch specific details for Outcode or Full Postcode (Online)
+        pcDebounceTimer = setTimeout(async () => {
+            try {
+                let url = `https://api.postcodes.io/postcodes/${input}`;
+                let res = await fetch(url);
+                
+                if (!res.ok) {
+                    url = `https://api.postcodes.io/outcodes/${input}`;
+                    res = await fetch(url);
+                }
+
+                if (res.ok) {
+                    let data = await res.json();
+                    
+                    let getPrimary = (val) => Array.isArray(val) ? val[0] : val;
+                    
+                    let admin_district = getPrimary(data.result.admin_district);
+                    let admin_county = getPrimary(data.result.admin_county);
+                    let parish = getPrimary(data.result.parish);
+
+                    let townStr = admin_district || parish || region;
+                    let countyStr = admin_county || admin_district || 'N/A';
+
+                    resultBox.innerHTML = `
+                        <div style="color:var(--price-green); font-size:1.2rem; margin-bottom:4px;">${townStr}</div>
+                        <div style="color:#555; font-size:0.95rem;">County: ${countyStr}</div>
+                        <div style="color:var(--frost-blue); font-size:0.75rem; margin-top:6px; padding-top:6px; border-top:1px solid #ddd;">Main Area: ${region}</div>
+                    `;
+                } else {
+                    resultBox.innerHTML = `<span style="color:var(--frost-blue); font-size:1.1rem;">Area: ${region}</span><br><span style="font-size:0.8rem; color:var(--frost-red); margin-top:5px;">Awaiting more numbers...</span>`;
+                }
+            } catch (err) {
+                resultBox.innerHTML = `<span style="color:var(--frost-blue)">Area: ${region}</span>`;
+            }
+        }, 400); 
     }
 
     document.addEventListener('change', async (e) => {
