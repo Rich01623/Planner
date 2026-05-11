@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FROST Transport Planner - STABLE VERSION</title>
+    <title>FROST Transport Planner - V5.2 (Day Mode Optimized)</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
     <style>
         :root {
             --frost-red: #c1272d;
@@ -15,26 +18,16 @@
             --whatsapp-green: #25D366;
             --price-green: #2e7d32;
             --sidebar-width: 320px;
-            --bg-dark: #121212;
         }
 
-        /* DEFAULT: Day Mode */
         body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--light-grey); color: #000; overflow: hidden; }
-        header { background: white; padding: 10px 20px; border-bottom: 3px solid var(--frost-red); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; }
+        header { background: white; padding: 10px 20px; border-bottom: 3px solid var(--frost-red); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
         
-        /* Night Mode Overrides */
-        body.night-mode { background: var(--bg-dark); color: #e0e0e0; }
-        body.night-mode header { background: #1a1a1a; }
-        body.night-mode #planner-board, body.night-mode #invoicing-view { background: #1e1e1e; }
-        body.night-mode .job-card { background: #2a2a2a; color: white; border-color: #444; }
-        body.night-mode .driver-cell { background: #252525; color: white; }
-        body.night-mode td { border: 1px solid #333; }
-        body.night-mode .modal-content { background: #222; color: white; }
-        body.night-mode input, body.night-mode select { background: #333; color: white; border: 1px solid #444; }
-
         .logo-container img { height: 50px; }
         .grand-total-box { background: var(--frost-black); color: white; padding: 5px 15px; border-radius: 6px; border-left: 4px solid var(--price-green); }
         .grand-total-value { font-size: 1.1rem; font-weight: bold; color: var(--whatsapp-green); }
+
+        .week-info-box { background: #e0e0e0; color: var(--frost-red); padding: 5px 12px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.85rem; font-weight: bold; }
 
         .week-selector { background: #333; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; z-index: 90; }
         .menu-group { display: flex; gap: 8px; align-items: center; }
@@ -43,48 +36,70 @@
         .nav-blue { background: var(--frost-blue); }
 
         main { display: flex; flex-grow: 1; overflow: hidden; position: relative; }
-        #unassigned-sidebar { width: var(--sidebar-width); background: #eee; border-right: 2px solid #ddd; transition: margin-left 0.3s ease; margin-left: calc(-1 * var(--sidebar-width)); flex-shrink: 0; z-index: 80; }
+        #unassigned-sidebar { width: var(--sidebar-width); background: #eee; border-right: 2px solid var(--border-color); transition: margin-left 0.3s ease; margin-left: calc(-1 * var(--sidebar-width)); flex-shrink: 0; z-index: 80; }
         #unassigned-sidebar.open { margin-left: 0; }
-        #pool-container { flex-grow: 1; overflow-y: auto; padding: 10px; margin: 10px; border: 2px dashed #bbb; border-radius: 6px; min-height: 100px; }
+        #pool-container { flex-grow: 1; overflow-y: auto; padding: 10px; margin: 10px; border: 2px dashed #aaa; border-radius: 6px; min-height: 100px; background: white; }
 
         #content-area { flex-grow: 1; overflow: hidden; padding: 10px; }
-        #planner-board, #invoicing-view { background: white; border-radius: 8px; height: 100%; overflow: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        #planner-board, #invoicing-view, #history-view { background: white; border-radius: 8px; height: 100%; overflow: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         
         table { width: 100%; border-collapse: collapse; min-width: 1000px; table-layout: fixed; }
-        th { background: var(--frost-black); color: white; border: 1px solid #444; padding: 12px 8px; position: sticky; top: 0; z-index: 5; text-align: left; }
-        .driver-cell { background: #eee; color: #000; font-weight: bold; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); position: sticky; left: 0; z-index: 2; border-bottom: 1px solid var(--border-color); }
-        .driver-weekly-total { font-size: 0.7rem; color: #666; display: block; margin-top: 4px; }
+        th { background: var(--frost-black); color: white; border: 1px solid var(--border-color); padding: 12px 8px; position: sticky; top: 0; z-index: 5; text-align: left; }
+        
+        .weekend-col { display: none; background: #f9f9f9 !important; }
+        .show-weekend .weekend-col { display: table-cell; }
+
+        .vehicle-cell { background: #eee; color: #000; width: 160px; padding: 10px; border-right: 3px solid var(--frost-red); border-bottom: 1px solid var(--border-color); position: sticky; left: 0; z-index: 2; vertical-align: middle; }
+        .reg-title { font-weight: bold; font-size: 0.95rem; display: block; color: var(--frost-red); margin-bottom: 5px; }
+        .driver-sel { width: 100%; padding: 4px; background: white; color: black; border: 1px solid #ccc; border-radius: 3px; font-size: 0.75rem; cursor: pointer; }
+        .driver-weekly-total { font-size: 0.7rem; color: #555; display: block; margin-top: 6px; font-weight: bold; }
+        
         td { border: 1px solid var(--border-color); min-height: 120px; vertical-align: top; padding: 6px; }
 
-        /* Card Elements */
-        .job-card { background: white; color: black; border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); cursor: grab; font-size: 0.72rem; }
-        .job-card.completed-grey { background: #d3d3d3 !important; border-left-color: #777 !important; color: #555 !important; opacity: 0.7; }
+        .job-card { background: white; color: black; border: 1px solid var(--border-color); border-left: 4px solid var(--frost-red); padding: 8px; margin-bottom: 6px; border-radius: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: grab; font-size: 0.72rem; position: relative; transition: all 0.2s; }
+        .job-card.completed-grey { background: #f0f0f0 !important; border-left-color: #bbb !important; color: #888 !important; opacity: 0.8; }
         
-        /* POSTCODE COLORS */
-        .postcode-header { display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; margin-bottom: 5px; font-size: 0.85rem; }
-        .pc-coll { color: var(--frost-red); }
-        .pc-del { color: var(--price-green); }
+        /* === 6-STAGE DISPATCH COLORS (DAY MODE OPTIMIZED) === */
+        .job-card.status-sent { border-left-color: #f39c12; } 
+        .job-card.status-ack { background: #e3f2fd; border-left-color: #0056b3; } 
+        .job-card.status-arr { background: #e8f5e9; border-left-color: #2e7d32; } 
+        .job-card.status-load { background: #f5eef8; border-left-color: #8e44ad; }
+        .job-card.status-del-arr { background: #fef9e7; border-left-color: #f1c40f; }
+        .job-card.status-tipped { background: #e8f8f5; border-left-color: #1abc9c; }
+
+        .postcode-header { display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: bold; margin-bottom: 5px; font-size: 0.85rem; pointer-events: none; }
+        .pc-coll { color: #c1272d; } 
+        .pc-del { color: #2e7d32; } 
+        .pc-del-2 { color: #d68910; }
         
         .card-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #eee; justify-content: space-between; }
-        .action-btn { color: #888; cursor: pointer; font-size: 1.1rem; }
+        .action-btn { color: #666; cursor: pointer; font-size: 1.1rem; }
         .action-btn:hover { color: var(--frost-red); }
 
         .card-body { display: none; margin-top: 8px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 5px;}
         .expanded .card-body { display: block; }
-        .card-section-label { color: var(--frost-red); font-weight: bold; text-transform: uppercase; font-size: 0.6rem; display: block; margin-top: 6px; }
-        .card-section-label.del { color: var(--whatsapp-green); }
+        .card-section-label { color: #c1272d; font-weight: bold; text-transform: uppercase; font-size: 0.6rem; display: block; margin-top: 6px; }
+        .card-section-label.del { color: #2e7d32; }
+        .card-section-label.contact { color: #0056b3; }
+        .detail-row { display: flex; justify-content: space-between; border-bottom: 1px solid #f4f4f4; padding: 2px 0; }
+        .detail-row b { color: #555; font-size: 0.65rem; }
 
         .vehicle-tag { background: var(--frost-blue); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; }
         .price-tag { background: var(--price-green); color: white; padding: 1px 5px; border-radius: 3px; font-size: 0.65rem; }
 
-        /* Modal Details */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 450px; max-height: 85vh; overflow-y: auto; position: relative; color: #000; }
+        .search-container { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+        #history-search { max-width: 400px; padding: 10px; background: white; color: black; border: 1px solid #ccc; border-radius: 4px; }
+        .pdf-btn { background: var(--frost-red); color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.7rem; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 450px; max-height: 85vh; overflow-y: auto; position: relative; color: black; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         .form-group { margin-bottom: 10px; }
-        label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; color: #666; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        label { display: block; font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; color: #444; }
+        input, select { width: 100%; padding: 8px; background: white; color: black; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
         .section-divider { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
         #add-job-btn { width: 100%; background: var(--frost-red); color: white; border: none; padding: 12px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+        
+        .multidrop-ui { background: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px dashed #ccc; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -92,8 +107,9 @@
 <header>
     <div class="logo-container"><img src="logo.png" alt="FROST"></div>
     <div style="display:flex; gap:15px; align-items:center;">
+        <div id="week-display-box" class="week-info-box">WK -- | MON --/--/--</div>
         <button class="week-btn" onclick="loadAll()">SYNC</button>
-        <button class="week-btn" onclick="document.body.classList.toggle('night-mode')">DAY/NIGHT</button>
+        <!-- NIGHT MODE TOGGLE BUTTON REMOVED -->
         <div class="grand-total-box"><span class="grand-total-value" id="grand-total">£0.00</span></div>
     </div>
 </header>
@@ -101,7 +117,10 @@
 <div class="week-selector">
     <div class="menu-group">
         <button class="week-btn nav-blue" onclick="toggleUnassigned()">UNASSIGNED</button>
-        <button class="week-btn nav-blue" onclick="openModal('modal-add')">+ NEW JOB</button>
+        <button class="week-btn nav-blue" onclick="resetForm(); openModal('modal-add')">+ NEW JOB</button>
+        <button class="week-btn" style="background:#888;" onclick="toggleWeekend()">WEEKEND BOOKINGS</button>
+        <button class="week-btn" style="background:#555;" onclick="alert('Subbed view coming soon')">SUBBED TO CONTRACTOR</button>
+        <button class="week-btn" style="background:#555;" onclick="alert('Cancelled view coming soon')">CANCELLED JOBS</button>
     </div>
     <div class="menu-group">
         <button class="week-btn active" id="btn-w0" onclick="switchView(0)">WEEK 1</button>
@@ -110,20 +129,23 @@
         <button class="week-btn" id="btn-w3" onclick="switchView(3)">WEEK 4</button>
     </div>
     <div class="menu-group">
+        <button class="week-btn nav-blue" id="btn-hist" onclick="switchView('history')">HISTORY</button>
         <button class="week-btn nav-blue" onclick="switchView('invoice')">INVOICES</button>
     </div>
 </div>
 
 <main>
     <section id="unassigned-sidebar">
-        <div style="padding:10px; background:#ddd; color:#000; font-weight:bold; display:flex; justify-content:space-between;">POOL <span onclick="toggleUnassigned()" style="cursor:pointer">×</span></div>
+        <div style="padding:10px; background:#e0e0e0; color:black; font-weight:bold; display:flex; justify-content:space-between; border-bottom: 1px solid #ccc;">POOL <span onclick="toggleUnassigned()" style="cursor:pointer; color: var(--frost-red);">✕</span></div>
         <div id="pool-container" ondrop="drop(event)" ondragover="allowDrop(event)"></div>
     </section>
 
     <div id="content-area">
         <section id="planner-board">
             <table>
-                <thead><tr id="dynamic-date-headers"><th>Driver</th></tr></thead>
+                <thead><tr id="dynamic-date-headers">
+                    <th style="width:160px; position: sticky; left: 0; z-index: 10; border-right: 3px solid var(--frost-red);">Vehicle / Driver</th>
+                </tr></thead>
                 <tbody id="planner-w0"></tbody>
                 <tbody id="planner-w1" style="display:none;"></tbody>
                 <tbody id="planner-w2" style="display:none;"></tbody>
@@ -132,12 +154,25 @@
         </section>
 
         <section id="invoicing-view" style="display:none; padding:20px;">
-            <h2 id="invoice-title">Invoice Queue</h2>
-            <table style="width:100%; border-collapse: collapse; background:white; color:black;">
-                <thead style="background:#333; color:white;">
+            <h2>Invoice Queue</h2>
+            <table style="width:100%; border-collapse: collapse;">
+                <thead style="background:#000; color:white;">
                     <tr><th><input type="checkbox" onclick="toggleAllInvoices(this)"></th><th>Date</th><th>Customer</th><th>Route</th><th>Price</th><th>Action</th></tr>
                 </thead>
                 <tbody id="invoice-list-body"></tbody>
+            </table>
+        </section>
+
+        <section id="history-view" style="display:none; padding:20px;">
+            <div class="search-container">
+                <h2 style="margin:0; margin-right: 20px;">Historical Archive</h2>
+                <input type="text" id="history-search" placeholder="Search customer, postcode, town or ref..." onkeyup="filterHistory()">
+            </div>
+            <table style="width:100%; border-collapse: collapse;">
+                <thead style="background:#000; color:white;">
+                    <tr><th style="width:100px;">Date</th><th>Customer</th><th>Route</th><th>Driver</th><th>Vehicle</th><th>Price</th><th style="width:120px;">Actions</th></tr>
+                </thead>
+                <tbody id="history-list-body"></tbody>
             </table>
         </section>
     </div>
@@ -146,55 +181,80 @@
 <div id="modal-add" class="modal-overlay" onclick="closeModalOnOutsideClick(event, 'modal-add')">
     <div class="modal-content">
         <h2 style="margin-top:0;">Job Details</h2>
-        <input type="hidden" id="edit-id">
-        <div class="form-group"><label>Booking Customer Name</label><input type="text" id="cust-name"></div>
+        <input type="hidden" id="sys_job_id">
+        <div class="form-group"><label>Booking Customer Name</label><input type="text" id="n_cust_name"></div>
+        <div style="display:flex; gap:5px;">
+            <div class="form-group" style="flex:1;"><label>Telephone</label><input type="text" id="n_cust_phone"></div>
+            <div class="form-group" style="flex:1;"><label>Email</label><input type="email" id="n_cust_email"></div>
+        </div>
         <hr class="section-divider">
-        <h4 style="margin:5px 0; color:var(--frost-red);">COLLECTION</h4>
-        <div class="form-group"><label>Street</label><input type="text" id="coll-street"></div>
+        <h4 style="margin:5px 0; color:#c1272d;">COLLECTION</h4>
+        <div class="form-group"><label>Post Code (Collection)</label><input type="text" id="n_coll_pc"></div>
+        <div class="form-group"><label>Street</label><input type="text" id="n_coll_street"></div>
         <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Town</label><input type="text" id="coll-town"></div>
-            <div class="form-group" style="flex:1;"><label>County</label><input type="text" id="coll-county"></div>
+            <div class="form-group" style="flex:1;"><label>Town</label><input type="text" id="n_coll_town"></div>
+            <div class="form-group" style="flex:1;"><label>County</label><input type="text" id="n_coll_county"></div>
         </div>
-        <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Post Code</label><input type="text" id="coll-postcode"></div>
-            <div class="form-group" style="flex:1;"><label>Ref</label><input type="text" id="coll-ref"></div>
-        </div>
-        <div class="form-group"><label>Collection Date & Time</label><input type="datetime-local" id="coll-datetime"></div>
+        <div class="form-group"><label>Ref</label><input type="text" id="n_coll_ref"></div>
+        <div class="form-group"><label>Collection Date & Time</label><input type="datetime-local" id="n_coll_dt"></div>
         <hr class="section-divider">
-        <h4 style="margin:5px 0; color:var(--whatsapp-green);">DELIVERY</h4>
-        <div class="form-group"><label>Delivery Name</label><input type="text" id="del-cust-name"></div>
-        <div class="form-group"><label>Street</label><input type="text" id="del-street"></div>
-        <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Town</label><input type="text" id="del-town"></div>
-            <div class="form-group" style="flex:1;"><label>County</label><input type="text" id="del-county"></div>
+        
+        <div class="multidrop-ui">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                <input type="checkbox" id="toggle_multidrop" style="width:auto;" onclick="toggleMultidropUI()">
+                <label for="toggle_multidrop" style="margin:0; color:#2e7d32;">Enable Multidrop (2nd Postcode)</label>
+            </div>
+            <div id="multidrop_input_container" style="display:none;">
+                <label>Post Code (Delivery 2)</label>
+                <input type="text" id="n_del_pc_2" placeholder="Enter 2nd Drop Postcode">
+            </div>
         </div>
+
+        <h4 style="margin:5px 0; color:#2e7d32;">DELIVERY</h4>
+        <div class="form-group"><label>Post Code (Delivery 1)</label><input type="text" id="n_del_pc"></div>
+        <div class="form-group"><label>Delivery Company Name</label><input type="text" id="n_del_name"></div>
+        <div class="form-group"><label>Street</label><input type="text" id="n_del_street"></div>
         <div style="display:flex; gap:5px;">
-            <div class="form-group" style="flex:1;"><label>Post Code</label><input type="text" id="del-postcode"></div>
-            <div class="form-group" style="flex:1;"><label>Ref</label><input type="text" id="del-ref"></div>
+            <div class="form-group" style="flex:1;"><label>Town</label><input type="text" id="n_8"></div>
+            <div class="form-group" style="flex:1;"><label>County</label><input type="text" id="n_9"></div>
         </div>
-        <div class="form-group"><label>Delivery Date & Time</label><input type="datetime-local" id="del-datetime"></div>
+        <div class="form-group"><label>Ref</label><input type="text" id="n_10"></div>
+        <div class="form-group"><label>Delivery Date & Time</label><input type="datetime-local" id="n_del_dt"></div>
         <hr class="section-divider">
         <div style="display:flex; gap:10px;">
-            <div class="form-group" style="flex:1;"><label>Vehicle</label><select id="vehicle-type"><option>Artic</option><option>Rigid</option><option>7.5t</option><option>Van</option></select></div>
-            <div class="form-group" style="flex:1;"><label>Price (£)</label><input type="text" id="job-price"></div>
+            <div class="form-group" style="flex:1;"><label>Vehicle</label><select id="n_veh_type"><option>Artic</option><option>Rigid</option><option>7.5t</option><option>Van</option></select></div>
+            <div class="form-group" style="flex:1;"><label>Price (£)</label><input type="text" id="n_price"></div>
         </div>
-        <button id="add-job-btn" onclick="saveJob()">Save Job</button>
-        <button class="week-btn" onclick="closeModal('modal-add')" style="width:100%; margin-top:8px; background:#888;">Cancel</button>
+        <button id="add-job-btn" onclick="saveJob()">Save Changes</button>
+        <button class="week-btn" onclick="closeModal('modal-add')" style="width:100%; margin-top:8px; background:#ddd; color:#333;">Close</button>
     </div>
 </div>
 
 <script>
-    const _URL = "https://tdrzytgiqvdulityqttr.supabase.co";
-    const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkcnp5dGdpcXZkdWxpdHlxdHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNTM5NTMsImV4cCI6MjA4ODcyOTk1M30.XN46i7u6STD-2afmN7-Jh1MltADGpEuWlLt_n7wknbA";
+    const _URL = "https://mbudwnwxucluwgbkgbfx.supabase.co";
+    const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1idWR3bnd4dWNsdXdnYmtnYmZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyMDQwMjYsImV4cCI6MjA5MDc4MDAyNn0.xFv-FiQ894vdfJuQYWQyF4WzQXmlnmnKvz_c8nuzl5Q";
     const sb = supabase.createClient(_URL, _KEY);
     const podFolder = "https://drive.google.com/drive/folders/173z9mkrCmqmEyEENeH__-qvdw1SFJl7w?usp=sharing";
 
-    const fleet = [
-        { name: "Andy West", phone: "447734369810" }, { name: "Callum Lee", phone: "447359390140" },
-        { name: "Josh Harrison", phone: "447701238574" }, { name: "Lee Woodcock", phone: "447701238577" },
-        { name: "Marc Wickham", phone: "447701238576" }, { name: "Neil Woods", phone: "447701238567" },
-        { name: "Rhys Hill", phone: "447701238572" }, { name: "Richard Spence", phone: "447701238570" },
-        { name: "Roy Taylor", phone: "447701238558" }, { name: "Stuart Sleigh", phone: "447701238575" }
+    const vehicles = [
+        "FN21 HLZ", "FR72 FTS", "FS72 FTS", "FT72 FTS", 
+        "KU70 XNR", "KU70 XNS", "KU70 XNT", "KU70 XNV", 
+        "KU70 XNW", "KU70 XNX", "FJ69 WMC", "DK69 ZHM"
+    ];
+
+    const drivers = [
+        { name: "Unassigned", phone: "" },
+        { name: "Andy West", phone: "447734369810" },
+        { name: "Callum Lee", phone: "447359390140" },
+        { name: "Josh Harrison", phone: "447701238574" },
+        { name: "Lee Woodcock", phone: "447701238577" },
+        { name: "Marc Wickham", phone: "447701238576" },
+        { name: "Neil Woods", phone: "447701238567" },
+        { name: "Rhys Hill", phone: "447701238572" },
+        { name: "Richard Spence", phone: "447701238570" },
+        { name: "Roy Taylor", phone: "447701238558" },
+        { name: "Stuart Sleigh", phone: "447701238575" },
+        { name: "Richard", phone: "447701238570" } 
     ];
 
     let allJobsRaw = [];
@@ -202,10 +262,20 @@
 
     ['planner-w0', 'planner-w1', 'planner-w2', 'planner-w3'].forEach((boardId) => {
         const board = document.getElementById(boardId);
-        fleet.forEach((driver, i) => {
+        vehicles.forEach((reg, i) => {
             let row = document.createElement('tr');
-            row.innerHTML = `<td class="driver-cell"><span>${driver.name}</span><span class="driver-weekly-total" id="${boardId}-total-${i}">Week: £0</span></td>` + 
-                            Array(5).fill(0).map((_,j) => `<td id="${boardId}-dr${i}-s${j}" ondrop="drop(event)" ondragover="allowDrop(event)"></td>`).join('');
+            let driverOptions = drivers.map(d => `<option value="${d.phone}">${d.name}</option>`).join('');
+            let colsHtml = `
+                <td class="vehicle-cell">
+                    <span class="reg-title">${reg}</span>
+                    <select class="driver-sel" id="sel-${boardId}-dr${i}">
+                        ${driverOptions}
+                    </select>
+                    <span class="driver-weekly-total" id="${boardId}-total-${i}">Week: £0</span>
+                </td>`;
+            for(let j=0; j<5; j++) colsHtml += `<td id="${boardId}-dr${i}-s${j}" ondrop="drop(event)" ondragover="allowDrop(event)"></td>`;
+            for(let j=5; j<7; j++) colsHtml += `<td class="weekend-col" id="${boardId}-dr${i}-s${j}" ondrop="drop(event)" ondragover="allowDrop(event)"></td>`;
+            row.innerHTML = colsHtml;
             board.appendChild(row);
         });
     });
@@ -216,231 +286,326 @@
         if (!jobs) return;
         allJobsRaw = jobs;
         jobs.forEach(q => {
-            if (q.status === 'archived' || q.status === 'billed') return;
+            if (q.status === 'driver_config' || q.status === 'archived' || q.status === 'billed') return;
             const card = createCardElement(q);
             const slot = q.assigned_slot ? document.getElementById(q.assigned_slot) : document.getElementById('pool-container');
             if (slot) slot.appendChild(card);
         });
+        
         renderInvoiceList();
+        renderHistoryList();
         updateCalculations();
+        restoreDrivers(jobs);
     }
 
     function createCardElement(q) {
         const card = document.createElement('div');
         const isCompleted = q.status === 'completed';
-        card.className = "job-card" + (isCompleted ? " completed-grey" : ""); 
+        
+        let dispatchClass = "";
+        if (q.dispatch_status === 'sent') dispatchClass = " status-sent";
+        if (q.dispatch_status === 'acknowledged') dispatchClass = " status-ack";
+        if (q.dispatch_status === 'arrived') dispatchClass = " status-arr";
+        if (q.dispatch_status === 'loaded') dispatchClass = " status-load";
+        if (q.dispatch_status === 'del_arrived') dispatchClass = " status-del-arr";
+        if (q.dispatch_status === 'tipped') dispatchClass = " status-tipped";
+
+        card.className = "job-card" + (isCompleted ? " completed-grey" : "") + dispatchClass; 
         card.id = q.id; 
         card.draggable = !isCompleted; 
         card.ondragstart = (e) => e.dataTransfer.setData("text", e.target.id);
         card.onclick = (e) => { if(!e.target.classList.contains('action-btn')) card.classList.toggle('expanded'); };
-        
+        const dtFormat = (str) => str ? str.replace('T', ' ') : '-';
+        const tOnly = (iso) => iso ? new Date(iso).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'}) : '--:--';
+
+        let pcHeader = `<span class="pc-coll">${q.coll_postcode || '??'}</span> ➔ `;
+        if (q.del_postcode_2 && q.del_postcode_2.trim() !== "") {
+            pcHeader += `<span class="pc-del-2">${q.del_postcode || '??'}</span> ➔ <span class="pc-del">${q.del_postcode_2}</span>`;
+        } else {
+            pcHeader += `<span class="pc-del">${q.del_postcode || '??'}</span>`;
+        }
+
+        let dispatchBadge = '';
+        if (q.dispatch_status === 'sent') dispatchBadge = `<span style="float:right; font-size:0.6rem; color:#f39c12; border:1px solid #f39c12; padding:1px 4px; border-radius:3px; background:white;">SENT</span>`;
+        if (q.dispatch_status === 'acknowledged') dispatchBadge = `<span style="float:right; font-size:0.6rem; color:#0056b3; border:1px solid #0056b3; padding:1px 4px; border-radius:3px; background:white;">ACKNOWLEDGED</span>`;
+        if (q.dispatch_status === 'arrived') dispatchBadge = `<span style="float:right; font-size:0.6rem; color:#2e7d32; border:1px solid #2e7d32; padding:1px 4px; border-radius:3px; background:white;">AT COLLECTION</span>`;
+        if (q.dispatch_status === 'loaded') dispatchBadge = `<span style="float:right; font-size:0.6rem; color:#8e44ad; border:1px solid #8e44ad; padding:1px 4px; border-radius:3px; background:white;">LOADED</span>`;
+        if (q.dispatch_status === 'del_arrived') dispatchBadge = `<span style="float:right; font-size:0.6rem; color:#d68910; border:1px solid #d68910; padding:1px 4px; border-radius:3px; background:white;">AT DELIVERY</span>`;
+        if (q.dispatch_status === 'tipped') dispatchBadge = `<span style="float:right; font-size:0.6rem; color:#1abc9c; border:1px solid #1abc9c; padding:1px 4px; border-radius:3px; background:white;">TIPPED</span>`;
+
         card.innerHTML = `
-            <div class="postcode-header">
-                <span class="pc-coll">${q.coll_postcode || '??'}</span> 
-                <span>➔</span> 
-                <span class="pc-del">${q.del_postcode || '??'}</span>
-            </div>
+            <div class="postcode-header">${pcHeader}</div>
             <div class="card-body">
                 <div class="card-actions">
                     <div style="display:flex; gap:10px;">
-                        <span class="action-btn" title="WhatsApp" onclick="sendWhatsApp(event, '${q.id}')">✆</span>
-                        <span class="action-btn" title="Edit" onclick="editJob(event, '${q.id}')">✎</span>
-                        <span class="action-btn" title="Split Job" onclick="splitJob(event, '${q.id}')">✂</span>
-                        <span class="action-btn" title="Duplicate" onclick="duplicateJob(event, '${q.id}')">❐</span>
-                        <span class="action-btn" title="POD Drive" onclick="window.open('${podFolder}', '_blank')">📎</span>
-                        <span class="action-btn" title="Query Route" onclick="queryRoute(event, '${q.coll_postcode}', '${q.del_postcode}')">📍</span>
-                        ${!isCompleted ? `<span class="action-btn" title="Mark POD Received" onclick="markPODReceived(event, '${q.id}')">✅</span>` : ''}
+                        <span class="action-btn" onclick="dispatchJob(event, '${q.id}')" title="Send to Driver App">📲</span>
+                        <span class="action-btn" onclick="editJob(event, '${q.id}')" title="Edit">✎</span>
+                        <span class="action-btn" onclick="splitJob(event, '${q.id}')" title="Split">✂</span>
+                        <span class="action-btn" onclick="duplicateJob(event, '${q.id}')" title="Duplicate">❐</span>
+                        <span class="action-btn" onclick="window.open('${podFolder}', '_blank')" title="POD Drive">📎</span>
+                        <span class="action-btn" onclick="queryRoute(event, '${q.coll_postcode}', '${q.del_postcode}')" title="Maps">📍</span>
+                        ${!isCompleted ? `<span class="action-btn" onclick="markPODReceived(event, '${q.id}')" title="Complete POD">✅</span>` : ''}
                     </div>
-                    <span class="action-btn" onclick="deleteJob('${q.id}')" style="color:red; font-weight:bold;">×</span>
+                    <span class="action-btn" onclick="deleteJob('${q.id}')" style="color:red;">🗑️</span>
                 </div>
-                <div style="font-weight:bold; font-size:0.8rem;">${q.customer_name}</div>
+                <div style="font-weight:bold; color:black; font-size: 0.8rem; margin-bottom: 5px;">${q.customer_name} ${dispatchBadge}</div>
                 <div style="display:flex; gap:5px; margin:5px 0;"><span class="vehicle-tag">${q.vehicle_type}</span><span class="price-tag">£<span class="data-price">${q.total_price}</span></span></div>
                 
-                <span class="card-section-label">COLLECTION</span>
-                <div>${q.coll_street || ''}</div>
-                <div>${q.coll_town || ''}, ${q.coll_county || ''}</div>
-                <div style="font-size:0.65rem"><b>Ref:</b> ${q.coll_ref || '-'} | <b>Time:</b> ${q.coll_datetime ? q.coll_datetime.replace('T',' ') : '-'}</div>
+                <span class="card-section-label contact">LIVE TIMESTAMPS (DEMURRAGE)</span>
+                <div class="detail-row" style="color:#0056b3;"><b>Acknowledged:</b> <span>${tOnly(q.ack_timestamp)}</span></div>
+                <div class="detail-row" style="color:#2e7d32;"><b>Arrived Coll:</b> <span>${tOnly(q.arrived_timestamp)}</span></div>
+                <div class="detail-row" style="color:#8e44ad;"><b>Loaded:</b> <span>${tOnly(q.loaded_timestamp)}</span></div>
+                <div class="detail-row" style="color:#d68910;"><b>Arrived Del:</b> <span>${tOnly(q.del_arrived_timestamp)}</span></div>
+                <div class="detail-row" style="color:#1abc9c;"><b>Tipped:</b> <span>${tOnly(q.tipped_timestamp)}</span></div>
 
+                <span class="card-section-label">COLLECTION</span>
+                <div class="detail-row"><b>Street:</b> <span>${q.coll_street || '-'}</span></div>
+                <div class="detail-row"><b>Town:</b> <span>${q.coll_town || '-'}</span></div>
+                <div class="detail-row"><b>Time:</b> <span>${dtFormat(q.coll_datetime)}</span></div>
                 <span class="card-section-label del">DELIVERY</span>
-                <div style="font-weight:bold">${q.del_cust_name || ''}</div>
-                <div>${q.del_street || ''}</div>
-                <div>${q.del_town || ''}, ${q.del_county || ''}</div>
-                <div style="font-size:0.65rem"><b>Ref:</b> ${q.del_ref || '-'} | <b>Time:</b> ${q.del_datetime ? q.del_datetime.replace('T',' ') : '-'}</div>
+                <div class="detail-row"><b>Company:</b> <span>${q.del_cust_name || '-'}</span></div>
+                <div class="detail-row"><b>Town:</b> <span>${q.del_town || '-'}</span></div>
+                <div class="detail-row"><b>Time:</b> <span>${dtFormat(q.del_datetime)}</span></div>
             </div>`;
         return card;
     }
 
-    function queryRoute(e, coll, del) {
-        e.stopPropagation();
-        if (!coll || !del) { alert("Missing postcodes for route."); return; }
-        window.open(`https://www.google.com/maps/dir/${encodeURIComponent(coll)}/${encodeURIComponent(del)}`, '_blank');
-    }
-
     async function saveJob() {
-        const id = document.getElementById('edit-id').value;
+        const id = document.getElementById('sys_job_id').value;
         const payload = {
-            customer_name: document.getElementById('cust-name').value,
-            coll_street: document.getElementById('coll-street').value,
-            coll_town: document.getElementById('coll-town').value,
-            coll_county: document.getElementById('coll-county').value,
-            coll_postcode: document.getElementById('coll-postcode').value,
-            coll_ref: document.getElementById('coll-ref').value,
-            coll_datetime: document.getElementById('coll-datetime').value,
-            del_cust_name: document.getElementById('del-cust-name').value,
-            del_street: document.getElementById('del-street').value,
-            del_town: document.getElementById('del-town').value,
-            del_county: document.getElementById('del-county').value,
-            del_postcode: document.getElementById('del-postcode').value,
-            del_ref: document.getElementById('del-ref').value,
-            del_datetime: document.getElementById('del-datetime').value,
-            total_price: document.getElementById('job-price').value || "0",
-            vehicle_type: document.getElementById('vehicle-type').value
+            customer_name: document.getElementById('n_cust_name').value,
+            customer_phone: document.getElementById('n_cust_phone').value,
+            customer_email: document.getElementById('n_cust_email').value,
+            coll_postcode: document.getElementById('n_coll_pc').value,
+            coll_street: document.getElementById('n_coll_street').value,
+            coll_town: document.getElementById('n_coll_town').value,
+            coll_county: document.getElementById('n_coll_county').value,
+            coll_ref: document.getElementById('n_coll_ref').value,
+            coll_datetime: document.getElementById('n_coll_dt').value,
+            del_postcode: document.getElementById('n_del_pc').value,
+            del_postcode_2: document.getElementById('n_del_pc_2').value,
+            del_cust_name: document.getElementById('n_del_name').value,
+            del_street: document.getElementById('n_del_street').value,
+            del_town: document.getElementById('n_8').value,
+            del_county: document.getElementById('n_9').value,
+            del_ref: document.getElementById('n_10').value,
+            del_datetime: document.getElementById('n_del_dt').value,
+            total_price: document.getElementById('n_price').value || "0",
+            vehicle_type: document.getElementById('n_veh_type').value
         };
-        if(id) await sb.from('quotes').update(payload).eq('id', id);
-        else { payload.status = 'pending'; await sb.from('quotes').insert([payload]); }
-        closeModal('modal-add');
-        loadAll();
+        try {
+            if(id) await sb.from('quotes').update(payload).eq('id', id);
+            else { payload.status = 'pending'; await sb.from('quotes').insert([payload]); }
+            closeModal('modal-add'); loadAll();
+        } catch(e) { console.error(e); alert("Error saving."); }
     }
 
     function editJob(e, id) {
         e.stopPropagation();
         const j = allJobsRaw.find(x => x.id == id);
-        document.getElementById('edit-id').value = id;
-        document.getElementById('cust-name').value = j.customer_name;
-        document.getElementById('coll-street').value = j.coll_street || '';
-        document.getElementById('coll-town').value = j.coll_town || '';
-        document.getElementById('coll-county').value = j.coll_county || '';
-        document.getElementById('coll-postcode').value = j.coll_postcode || '';
-        document.getElementById('coll-ref').value = j.coll_ref || '';
-        document.getElementById('coll-datetime').value = j.coll_datetime || '';
-        document.getElementById('del-cust-name').value = j.del_cust_name || '';
-        document.getElementById('del-street').value = j.del_street || '';
-        document.getElementById('del-town').value = j.del_town || '';
-        document.getElementById('del-county').value = j.del_county || '';
-        document.getElementById('del-postcode').value = j.del_postcode || '';
-        document.getElementById('del-ref').value = j.del_ref || '';
-        document.getElementById('del-datetime').value = j.del_datetime || '';
-        document.getElementById('job-price').value = j.total_price;
-        document.getElementById('vehicle-type').value = j.vehicle_type;
+        if(!j) return;
+        resetForm();
+        document.getElementById('sys_job_id').value = id;
+        document.getElementById('n_cust_name').value = j.customer_name || '';
+        document.getElementById('n_cust_phone').value = j.customer_phone || '';
+        document.getElementById('n_cust_email').value = j.customer_email || '';
+        document.getElementById('n_coll_pc').value = j.coll_postcode || '';
+        document.getElementById('n_coll_street').value = j.coll_street || '';
+        document.getElementById('n_coll_town').value = j.coll_town || '';
+        document.getElementById('n_coll_county').value = j.coll_county || '';
+        document.getElementById('n_coll_ref').value = j.coll_ref || '';
+        document.getElementById('n_coll_dt').value = j.coll_datetime || '';
+        document.getElementById('n_del_pc').value = j.del_postcode || '';
+        document.getElementById('n_del_pc_2').value = j.del_postcode_2 || '';
+        document.getElementById('n_del_name').value = j.del_cust_name || '';
+        document.getElementById('n_del_street').value = j.del_street || '';
+        document.getElementById('n_8').value = j.del_town || '';
+        document.getElementById('n_9').value = j.del_county || '';
+        document.getElementById('n_10').value = j.del_ref || '';
+        document.getElementById('n_del_dt').value = j.del_datetime || '';
+        document.getElementById('n_price').value = j.total_price || '0';
+        document.getElementById('n_veh_type').value = j.vehicle_type || 'Artic';
+        if(j.del_postcode_2) { document.getElementById('toggle_multidrop').checked = true; toggleMultidropUI(); }
         openModal('modal-add');
     }
 
-    async function splitJob(e, id) {
+    async function dispatchJob(e, id) {
         e.stopPropagation();
-        const j = {...allJobsRaw.find(x => x.id == id)};
-        delete j.id;
-        j.coll_ref = (j.coll_ref || "") + " (SPLIT)";
-        j.status = 'pending'; j.assigned_slot = null;
-        await sb.from('quotes').insert([j]);
-        loadAll();
-    }
+        const j = allJobsRaw.find(x => x.id == id);
+        if (!j || !j.assigned_slot || j.assigned_slot.includes('pool')) return alert("Please assign the job to a driver's row first.");
 
-    async function duplicateJob(e, id) {
-        e.stopPropagation();
-        const j = {...allJobsRaw.find(x => x.id == id)};
-        delete j.id; j.status = 'pending'; j.assigned_slot = null;
-        await sb.from('quotes').insert([j]);
-        loadAll();
-    }
-
-    async function deleteJob(id) {
-        const job = allJobsRaw.find(j => j.id == id);
-        if (job.status === 'completed') {
-            if (confirm("Hide this card?")) await sb.from('quotes').update({ status: 'archived' }).eq('id', id);
-        } else {
-            if (confirm("Delete permanently?")) await sb.from('quotes').delete().eq('id', id);
+        const cellId = j.assigned_slot.split('-s')[0]; 
+        const dropdown = document.getElementById(`sel-${cellId}`);
+        if (!dropdown || !dropdown.value) return alert("Please select a driver in the row's dropdown first.");
+        
+        const driverName = dropdown.options[dropdown.selectedIndex].text.toLowerCase();
+        
+        try {
+            await sb.from('quotes').update({ 
+                dispatch_status: 'sent',
+                assigned_driver: driverName 
+            }).eq('id', id);
+            
+            loadAll(); 
+        } catch(err) {
+            alert("Error dispatching job: " + err.message);
         }
-        loadAll();
+    }
+
+    async function duplicateJob(e, id) { e.stopPropagation(); const j = {...allJobsRaw.find(x => x.id == id)}; delete j.id; j.status = 'pending'; j.assigned_slot = null; await sb.from('quotes').insert([j]); loadAll(); }
+    async function splitJob(e, id) { e.stopPropagation(); if(confirm("Split this job?")) await duplicateJob(e, id); }
+    function queryRoute(e, pc1, pc2) { e.stopPropagation(); window.open(`https://www.google.com/maps/dir/${pc1}/${pc2}`, '_blank'); }
+    async function markPODReceived(e, id) { e.stopPropagation(); if(confirm("Move to Invoicing?")) { await sb.from('quotes').update({ status: 'completed' }).eq('id', id); loadAll(); } }
+    async function deleteJob(id) { if(confirm("Delete permanently?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); } }
+
+    function renderInvoiceList() {
+        const body = document.getElementById('invoice-list-body');
+        if (!body) return; body.innerHTML = "";
+        allJobsRaw.filter(j => j.status === 'completed').forEach(j => {
+            body.innerHTML += `<tr><td><input type="checkbox" class="invoice-check" value="${j.id}"></td><td>${formatUKDate(j.coll_datetime)}</td><td>${j.customer_name}</td><td>${j.coll_town} ➔ ${j.del_town}</td><td>£${j.total_price}</td><td><button class="pdf-btn" onclick="markAsBilled('${j.id}')">MARK BILLED</button></td></tr>`;
+        });
+    }
+
+    async function markAsBilled(id) { await sb.from('quotes').update({ status: 'billed' }).eq('id', id); loadAll(); }
+
+    function renderHistoryList() {
+        const body = document.getElementById('history-list-body');
+        if (!body) return; body.innerHTML = "";
+        allJobsRaw.filter(j => j.status === 'billed' || j.status === 'archived').sort((a,b) => new Date(b.coll_datetime) - new Date(a.coll_datetime)).forEach(j => {
+            body.innerHTML += `<tr class="history-row" onclick="editJob(event, '${j.id}')"><td>${formatUKDate(j.coll_datetime)}</td><td>${j.customer_name}</td><td>${j.coll_town} ➔ ${j.del_town}</td><td>-</td><td>${j.vehicle_type}</td><td>£${j.total_price}</td><td><button class="pdf-btn" onclick="generatePDF(event, '${j.id}')">📄 PDF</button></td></tr>`;
+        });
+    }
+
+    function generatePDF(event, id) {
+        event.stopPropagation();
+        const j = allJobsRaw.find(x => x.id == id);
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        doc.text(`FROST TRANSPORT - JOB SUMMARY`, 10, 10);
+        doc.autoTable({ startY: 20, body: [['Customer', j.customer_name], ['Route', `${j.coll_town} to ${j.del_town}`], ['Price', `£${j.total_price}`]] });
+        doc.save(`Job_${j.id.slice(0,5)}.pdf`);
+    }
+
+    function filterHistory() {
+        const q = document.getElementById('history-search').value.toLowerCase();
+        document.querySelectorAll('#history-list-body tr').forEach(r => { r.style.display = r.innerText.toLowerCase().includes(q) ? "" : "none"; });
     }
 
     async function drop(ev) {
         ev.preventDefault();
         const id = ev.dataTransfer.getData("text");
         const target = ev.currentTarget;
-        const finalTarget = target.classList.contains('job-card') ? target.parentElement : target;
-        await sb.from('quotes').update({ 
-            status: finalTarget.id === 'pool-container' ? 'pending' : 'assigned', 
-            assigned_slot: finalTarget.id === 'pool-container' ? null : finalTarget.id 
-        }).eq('id', id);
+        let finalTarget = target.classList.contains('job-card') ? target.parentElement : target;
+        const isPool = finalTarget.id === 'pool-container';
+
+        let assignedDriver = null;
+        if (!isPool) {
+            const cellId = finalTarget.id.split('-s')[0]; 
+            const dropdown = document.getElementById(`sel-${cellId}`);
+            if (dropdown && dropdown.value) {
+                assignedDriver = dropdown.options[dropdown.selectedIndex].text.toLowerCase();
+                if (assignedDriver === 'unassigned') assignedDriver = null;
+            }
+        }
+
+        let updatePayload = { 
+            status: isPool ? 'pending' : 'assigned', 
+            assigned_slot: isPool ? null : finalTarget.id,
+            assigned_driver: assignedDriver 
+        };
+
+        if (isPool) updatePayload.dispatch_status = 'unsent'; 
+
+        await sb.from('quotes').update(updatePayload).eq('id', id);
         loadAll();
     }
 
-    function renderInvoiceList() {
-        const body = document.getElementById('invoice-list-body');
-        if (!body) return;
-        body.innerHTML = "";
-        allJobsRaw.filter(j => j.status === 'completed' || j.status === 'archived').forEach(j => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td><input type="checkbox" class="inv-check" value="${j.id}"></td><td>${j.coll_datetime?.split('T')[0] || '-'}</td><td>${j.customer_name}</td><td>${j.coll_town}➔${j.del_town}</td><td>£${j.total_price}</td><td><button style="color:red;" onclick="permDelete('${j.id}')">Delete</button></td>`;
-            body.appendChild(tr);
-        });
-    }
-
-    async function permDelete(id) {
-        if(confirm("Erase from Database?")) { await sb.from('quotes').delete().eq('id', id); loadAll(); }
-    }
-
-    function switchView(view) {
-        document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('active'));
-        if (view === 'invoice') {
-            document.getElementById('planner-board').style.display = 'none';
-            document.getElementById('invoicing-view').style.display = 'block';
-        } else {
-            currentWeekOffset = view;
-            document.getElementById('planner-board').style.display = 'block';
-            document.getElementById('invoicing-view').style.display = 'none';
-            document.getElementById(`btn-w${view}`).classList.add('active');
-            [0,1,2,3].forEach(i => document.getElementById(`planner-w${i}`).style.display = (i === view ? 'table-row-group' : 'none'));
-            updateDateHeaders(view);
-            updateCalculations();
-        }
-    }
-
     function updateCalculations() {
-        let grand = 0;
-        const boardId = `planner-w${currentWeekOffset}`;
-        fleet.forEach((_, i) => {
-            let sum = 0;
-            document.querySelectorAll(`[id^="${boardId}-dr${i}-s"] .data-price`).forEach(p => sum += parseFloat(p.innerText) || 0);
-            document.getElementById(`${boardId}-total-${i}`).innerText = `Week: £${sum.toFixed(2)}`;
+        let grand = 0; const boardId = `planner-w${currentWeekOffset}`;
+        vehicles.forEach((_, i) => {
+            let sum = 0; document.querySelectorAll(`[id^="${boardId}-dr${i}-s"] .data-price`).forEach(p => sum += parseFloat(p.innerText) || 0);
+            const el = document.getElementById(`${boardId}-total-${i}`);
+            if (el) el.innerText = `Week: £${sum.toFixed(2)}`;
             grand += sum;
         });
         document.getElementById('grand-total').innerText = "£" + grand.toFixed(2);
     }
 
+    function switchView(view) {
+        document.querySelectorAll('.week-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('planner-board').style.display = 'none';
+        document.getElementById('invoicing-view').style.display = 'none';
+        document.getElementById('history-view').style.display = 'none';
+        if (view === 'invoice') document.getElementById('invoicing-view').style.display = 'block';
+        else if (view === 'history') { document.getElementById('history-view').style.display = 'block'; document.getElementById('btn-hist').classList.add('active'); }
+        else {
+            currentWeekOffset = view; document.getElementById('planner-board').style.display = 'block';
+            document.getElementById(`btn-w${view}`).classList.add('active');
+            [0,1,2,3].forEach(i => document.getElementById(`planner-w${i}`).style.display = (i === view ? 'table-row-group' : 'none'));
+            const info = getWeekInfo(view); document.getElementById('week-display-box').innerText = `WK ${info.week} | MON ${info.date}`;
+            updateDateHeaders(view); updateCalculations();
+        }
+    }
+
+    function getWeekInfo(offset) {
+        let now = new Date(); let mon = new Date(now.setDate(now.getDate() - now.getDay() + 1 + (offset * 7)));
+        let d = new Date(Date.UTC(mon.getFullYear(), mon.getMonth(), mon.getDate()));
+        let dayNum = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+        let weekNo = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+        return { week: weekNo, date: mon.toLocaleDateString('en-GB') };
+    }
+
     function updateDateHeaders(offset) {
         const headerRow = document.getElementById('dynamic-date-headers');
-        let curr = new Date();
-        let first = curr.getDate() - curr.getDay() + 1 + (offset * 7);
-        let html = `<th style="width:160px;">Driver</th>`;
-        ['Mon','Tue','Wed','Thu','Fri'].forEach((day, i) => {
+        let now = new Date(); let first = now.getDate() - now.getDay() + 1 + (offset * 7);
+        let html = `<th style="width:160px; position: sticky; left: 0; top: 0; z-index: 10; border-right: 3px solid var(--frost-red);">Vehicle / Driver</th>`;
+        ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((day, i) => {
             let d = new Date(new Date().setDate(first + i));
-            html += `<th>${day} ${d.toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit'})}</th>`;
+            html += `<th class="${i >= 5 ? 'weekend-col' : ''}">${day} ${d.toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit'})}</th>`;
         });
         headerRow.innerHTML = html;
     }
 
-    function sendWhatsApp(e, id) {
-        e.stopPropagation();
-        const j = allJobsRaw.find(x => x.id == id);
-        const drRow = document.getElementById(id).closest('tr');
-        const drName = drRow.querySelector('.driver-cell span').innerText;
-        const dr = fleet.find(d => d.name === drName);
-        const msg = `Hi ${drName},\nJob: ${j.coll_town} to ${j.del_town}\nRef: ${j.coll_ref}\nPrice: £${j.total_price}`;
-        window.open(`https://wa.me/${dr.phone}?text=${encodeURIComponent(msg)}`, '_blank');
+    function toggleMultidropUI() { document.getElementById('multidrop_input_container').style.display = document.getElementById('toggle_multidrop').checked ? 'block' : 'none'; }
+    function resetForm() {
+        document.getElementById('sys_job_id').value = '';
+        ['n_cust_name','n_cust_phone', 'n_cust_email','n_coll_town','n_coll_pc','n_coll_dt','n_8','n_del_pc','n_price','n_coll_street','n_coll_county','n_coll_ref','n_del_name','n_del_street','n_9','n_10','n_del_dt', 'n_del_pc_2'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = ''; });
+        document.getElementById('toggle_multidrop').checked = false; toggleMultidropUI();
     }
 
-    async function markPODReceived(e, id) { 
-        e.stopPropagation(); 
-        await sb.from('quotes').update({ status: 'completed' }).eq('id', id); 
-        loadAll();
-    }
-
+    function formatUKDate(iso) { if(!iso) return '-'; return new Date(iso).toLocaleDateString('en-GB'); }
+    function toggleWeekend() { document.body.classList.toggle('show-weekend'); }
     function toggleUnassigned() { document.getElementById('unassigned-sidebar').classList.toggle('open'); }
     function allowDrop(ev) { ev.preventDefault(); }
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; document.getElementById('edit-id').value = ''; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     function closeModalOnOutsideClick(e, id) { if(e.target.id === id) closeModal(id); }
+
+    function restoreDrivers(jobs) {
+        jobs.forEach(q => {
+            if (q.status === 'driver_config') {
+                const el = document.getElementById(q.assigned_slot);
+                if (el) el.value = q.driver_phone || q.customer_phone || "";
+            }
+        });
+    }
+
+    document.addEventListener('change', async (e) => {
+        if (e.target.classList.contains('driver-sel')) {
+            const selectId = e.target.id; 
+            const driverPhone = e.target.value;
+            
+            const { data: existing } = await sb.from('quotes').select('id').eq('status', 'driver_config').eq('assigned_slot', selectId);
+
+            if (existing && existing.length > 0) {
+                await sb.from('quotes').update({ driver_phone: driverPhone, customer_phone: driverPhone }).eq('id', existing[0].id);
+            } else {
+                await sb.from('quotes').insert([{ 
+                    status: 'driver_config', customer_name: "DRIVER_CONFIG", assigned_slot: selectId, driver_phone: driverPhone, customer_phone: driverPhone 
+                }]);
+            }
+        }
+    });
 
     window.onload = () => { switchView(0); loadAll(); };
 </script>
